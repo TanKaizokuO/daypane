@@ -7,9 +7,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use gtk4 as gtk;
-use gtk::prelude::*;
 use gtk::glib;
+use gtk::prelude::*;
+use gtk4 as gtk;
 use notify::{EventKind, RecursiveMode, Watcher};
 
 /// Bursts of file events (a transaction touches the db and the WAL several times) collapse into one reload.
@@ -21,18 +21,34 @@ pub fn is_db_file(path: &std::path::Path, db_name: &str) -> bool {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return false;
     };
-    name == db_name || name.strip_prefix(db_name).is_some_and(|rest| rest == "-wal" || rest == "-journal")
+    name == db_name
+        || name
+            .strip_prefix(db_name)
+            .is_some_and(|rest| rest == "-wal" || rest == "-journal")
 }
 
 fn is_write(kind: &EventKind) -> bool {
-    matches!(kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_))
+    matches!(
+        kind,
+        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+    )
 }
 
 /// Start watching `db_path`. Triggers `win.reload` on `window` (main thread) after the debounce.
 /// The returned watcher must be kept alive.
-pub fn watch(window: &gtk::ApplicationWindow, db_path: PathBuf) -> Result<notify::RecommendedWatcher> {
-    let db_name = db_path.file_name().and_then(|n| n.to_str()).context("database path has no file name")?.to_string();
-    let dir = db_path.parent().context("database path has no parent directory")?.to_path_buf();
+pub fn watch(
+    window: &gtk::ApplicationWindow,
+    db_path: PathBuf,
+) -> Result<notify::RecommendedWatcher> {
+    let db_name = db_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .context("database path has no file name")?
+        .to_string();
+    let dir = db_path
+        .parent()
+        .context("database path has no parent directory")?
+        .to_path_buf();
     let weak: glib::SendWeakRef<gtk::ApplicationWindow> = window.downgrade().into();
     let pending = Arc::new(AtomicBool::new(false));
 
@@ -57,7 +73,9 @@ pub fn watch(window: &gtk::ApplicationWindow, db_path: PathBuf) -> Result<notify
         });
     })?;
     // Watch the directory: the WAL file is created and removed as connections come and go.
-    watcher.watch(&dir, RecursiveMode::NonRecursive).with_context(|| format!("watching {}", dir.display()))?;
+    watcher
+        .watch(&dir, RecursiveMode::NonRecursive)
+        .with_context(|| format!("watching {}", dir.display()))?;
     Ok(watcher)
 }
 

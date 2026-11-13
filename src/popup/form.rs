@@ -6,7 +6,8 @@ use crate::capture;
 use crate::db::{Priority, Task, TaskPatch};
 
 /// Order of the priority drop-down rows.
-pub const PRIORITIES: [Priority; 4] = [Priority::None, Priority::Low, Priority::Med, Priority::High];
+pub const PRIORITIES: [Priority; 4] =
+    [Priority::None, Priority::Low, Priority::Med, Priority::High];
 pub const PRIORITY_NAMES: [&str; 4] = ["none", "low", "med", "high"];
 
 pub fn priority_index(p: Priority) -> u32 {
@@ -32,8 +33,14 @@ impl FormInput {
     pub fn from_task(t: &Task) -> Self {
         Self {
             title: t.title.clone(),
-            date: t.due_date.map(|d| d.format("%Y-%m-%d").to_string()).unwrap_or_default(),
-            time: t.due_time.map(|t| t.format("%H:%M").to_string()).unwrap_or_default(),
+            date: t
+                .due_date
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .unwrap_or_default(),
+            time: t
+                .due_time
+                .map(|t| t.format("%H:%M").to_string())
+                .unwrap_or_default(),
             priority: t.priority,
             tags: t.tags.join(" "),
             notes: t.notes.clone(),
@@ -85,7 +92,11 @@ pub fn parse_time(s: &str, now: NaiveDateTime) -> Result<Option<NaiveTime>, Stri
 
 /// Validate `input` against `task` and return only the changed fields.
 /// `Ok(None)` = nothing changed. `Err` = a message for the form's error line.
-pub fn build_patch(task: &Task, input: &FormInput, now: NaiveDateTime) -> Result<Option<TaskPatch>, String> {
+pub fn build_patch(
+    task: &Task,
+    input: &FormInput,
+    now: NaiveDateTime,
+) -> Result<Option<TaskPatch>, String> {
     let title = input.title.trim();
     if title.is_empty() {
         return Err("Title is required".into());
@@ -127,7 +138,10 @@ mod tests {
     use super::*;
 
     fn now() -> NaiveDateTime {
-        NaiveDate::from_ymd_opt(2026, 11, 13).unwrap().and_hms_opt(9, 0, 0).unwrap()
+        NaiveDate::from_ymd_opt(2026, 11, 13)
+            .unwrap()
+            .and_hms_opt(9, 0, 0)
+            .unwrap()
     }
 
     fn task() -> Task {
@@ -165,7 +179,11 @@ mod tests {
         assert_eq!(p.title.as_deref(), Some("Pay rent!"));
         assert_eq!(p.priority, Some(Priority::High));
         assert_eq!(p.tags, Some(vec!["home".into(), "urgent".into()]));
-        assert_eq!((p.notes, p.due_date, p.due_time), (None, None, None), "trailing whitespace is not a change");
+        assert_eq!(
+            (p.notes, p.due_date, p.due_time),
+            (None, None, None),
+            "trailing whitespace is not a change"
+        );
     }
 
     #[test]
@@ -187,7 +205,10 @@ mod tests {
 
         let mut f = FormInput::from_task(&t);
         f.date.clear();
-        assert_eq!(build_patch(&t, &f, now()), Err("A time needs a date".into()));
+        assert_eq!(
+            build_patch(&t, &f, now()),
+            Err("A time needs a date".into())
+        );
 
         let mut f = FormInput::from_task(&t);
         f.time = "zzz".into();
@@ -199,10 +220,19 @@ mod tests {
 
     #[test]
     fn strict_formats_parse() {
-        assert_eq!(parse_date("2026-12-01", now()), Ok(NaiveDate::from_ymd_opt(2026, 12, 1)));
+        assert_eq!(
+            parse_date("2026-12-01", now()),
+            Ok(NaiveDate::from_ymd_opt(2026, 12, 1))
+        );
         assert_eq!(parse_date("  ", now()), Ok(None));
-        assert_eq!(parse_time("9:05", now()), Ok(NaiveTime::from_hms_opt(9, 5, 0)));
-        assert_eq!(parse_time("17:30", now()), Ok(NaiveTime::from_hms_opt(17, 30, 0)));
+        assert_eq!(
+            parse_time("9:05", now()),
+            Ok(NaiveTime::from_hms_opt(9, 5, 0))
+        );
+        assert_eq!(
+            parse_time("17:30", now()),
+            Ok(NaiveTime::from_hms_opt(17, 30, 0))
+        );
     }
 
     #[test]

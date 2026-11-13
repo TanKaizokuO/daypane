@@ -6,13 +6,13 @@ use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use chrono::{Local, NaiveDate};
-use gtk4 as gtk;
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
+use gtk4 as gtk;
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
-use super::format::{self, HINT};
 use super::form::{self, FormInput};
+use super::format::{self, HINT};
 use super::layout::{self, Step};
 use super::undo::{Action, UndoStack};
 use crate::app::APP_NAME;
@@ -114,11 +114,19 @@ pub fn set_class(w: &impl IsA<gtk::Widget>, class: &str, on: bool) {
 }
 
 fn label(text: &str, classes: &[&str]) -> gtk::Label {
-    gtk::Label::builder().label(text).xalign(0.0).css_classes(classes.to_vec()).build()
+    gtk::Label::builder()
+        .label(text)
+        .xalign(0.0)
+        .css_classes(classes.to_vec())
+        .build()
 }
 
 fn field(name: &str, w: &impl IsA<gtk::Widget>) -> gtk::Box {
-    let row = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).hexpand(true).build();
+    let row = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(2)
+        .hexpand(true)
+        .build();
     row.append(&label(name, &["form-label"]));
     row.append(w);
     row
@@ -187,7 +195,10 @@ impl Ui {
 
     fn build_widgets(window: &gtk::ApplicationWindow) -> Widgets {
         // ── input bar (capture / search) ──
-        let entry = gtk::Entry::builder().hexpand(true).css_classes(["input-entry"]).build();
+        let entry = gtk::Entry::builder()
+            .hexpand(true)
+            .css_classes(["input-entry"])
+            .build();
         let chip = label("", &["chip"]);
         chip.set_visible(false);
         let bar = gtk::Box::builder()
@@ -205,24 +216,51 @@ impl Ui {
         let today_btn = button("Today", &["flat", "today-button"]);
         let month_label = label("", &["month-label"]);
         month_label.set_hexpand(true);
-        let header = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(4).build();
+        let header = gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .spacing(4)
+            .build();
         header.append(&month_label);
         header.append(&today_btn);
         header.append(&prev);
         header.append(&next);
 
-        let grid = gtk::Grid::builder().column_homogeneous(true).row_spacing(2).column_spacing(2).build();
+        let grid = gtk::Grid::builder()
+            .column_homogeneous(true)
+            .row_spacing(2)
+            .column_spacing(2)
+            .build();
         for (i, name) in layout::WEEKDAYS.iter().enumerate() {
-            let l = gtk::Label::builder().label(*name).css_classes(["weekday"]).build();
+            let l = gtk::Label::builder()
+                .label(*name)
+                .css_classes(["weekday"])
+                .build();
             grid.attach(&l, i as i32, 0, 1, 1);
         }
         let cells: Vec<DayCell> = (0..layout::GRID_DAYS)
             .map(|i| {
                 let number = gtk::Label::new(None);
-                let dots = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).halign(gtk::Align::Center).spacing(2).build();
-                dots.append(&gtk::Label::builder().label("•").css_classes(["dot", "dot-event"]).build());
-                dots.append(&gtk::Label::builder().label("•").css_classes(["dot", "dot-task"]).build());
-                let content = gtk::Box::builder().orientation(gtk::Orientation::Vertical).halign(gtk::Align::Center).build();
+                let dots = gtk::Box::builder()
+                    .orientation(gtk::Orientation::Horizontal)
+                    .halign(gtk::Align::Center)
+                    .spacing(2)
+                    .build();
+                dots.append(
+                    &gtk::Label::builder()
+                        .label("•")
+                        .css_classes(["dot", "dot-event"])
+                        .build(),
+                );
+                dots.append(
+                    &gtk::Label::builder()
+                        .label("•")
+                        .css_classes(["dot", "dot-task"])
+                        .build(),
+                );
+                let content = gtk::Box::builder()
+                    .orientation(gtk::Orientation::Vertical)
+                    .halign(gtk::Align::Center)
+                    .build();
                 content.append(&number);
                 content.append(&dots);
                 let button = gtk::Button::builder()
@@ -232,12 +270,19 @@ impl Ui {
                     .css_classes(["flat", "day"])
                     .build();
                 grid.attach(&button, (i % 7) as i32, (i / 7) as i32 + 1, 1, 1);
-                DayCell { button, number, date: Cell::new(NaiveDate::MIN) }
+                DayCell {
+                    button,
+                    number,
+                    date: Cell::new(NaiveDate::MIN),
+                }
             })
             .collect();
 
         let events_title = label("", &["pane-title"]);
-        let events_box = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).build();
+        let events_box = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(6)
+            .build();
         let events_scroll = gtk::ScrolledWindow::builder()
             .vexpand(true)
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -258,7 +303,10 @@ impl Ui {
 
         // ── right pane ──
         let tasks_title = label("", &["pane-title"]);
-        let task_box = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).build();
+        let task_box = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .build();
         let task_scroll = gtk::ScrolledWindow::builder()
             .vexpand(true)
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -279,13 +327,19 @@ impl Ui {
         right.append(&stack);
 
         // ── assembly ──
-        let panes = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).vexpand(true).build();
+        let panes = gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .vexpand(true)
+            .build();
         panes.append(&left);
         panes.append(&gtk::Separator::new(gtk::Orientation::Vertical));
         panes.append(&right);
         let status = label(HINT, &["status"]);
         status.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).css_classes(["root"]).build();
+        let root = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .css_classes(["root"])
+            .build();
         root.append(&bar);
         root.append(&panes);
         root.append(&status);
@@ -315,26 +369,48 @@ impl Ui {
 
     fn build_form() -> EditForm {
         let title = gtk::Entry::builder().placeholder_text("Title").build();
-        let date = gtk::Entry::builder().placeholder_text("YYYY-MM-DD or “tomorrow”").build();
+        let date = gtk::Entry::builder()
+            .placeholder_text("YYYY-MM-DD or “tomorrow”")
+            .build();
         let time = gtk::Entry::builder().placeholder_text("HH:MM").build();
         let priority = gtk::DropDown::from_strings(&form::PRIORITY_NAMES);
-        let tags = gtk::Entry::builder().placeholder_text("space-separated").build();
-        let notes = gtk::TextView::builder().wrap_mode(gtk::WrapMode::WordChar).css_classes(["notes-view"]).build();
-        let notes_scroll = gtk::ScrolledWindow::builder().vexpand(true).min_content_height(80).child(&notes).build();
+        let tags = gtk::Entry::builder()
+            .placeholder_text("space-separated")
+            .build();
+        let notes = gtk::TextView::builder()
+            .wrap_mode(gtk::WrapMode::WordChar)
+            .css_classes(["notes-view"])
+            .build();
+        let notes_scroll = gtk::ScrolledWindow::builder()
+            .vexpand(true)
+            .min_content_height(80)
+            .child(&notes)
+            .build();
         let error = label("", &["form-error"]);
         error.set_visible(false);
         let save = button("Save", &["suggested-action"]);
         let cancel = button("Cancel", &[]);
 
-        let when = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).build();
+        let when = gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .spacing(8)
+            .build();
         when.append(&field("Due date", &date));
         when.append(&field("Time", &time));
         when.append(&field("Priority", &priority));
-        let buttons = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).halign(gtk::Align::End).build();
+        let buttons = gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .spacing(8)
+            .halign(gtk::Align::End)
+            .build();
         buttons.append(&cancel);
         buttons.append(&save);
 
-        let page = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(8).css_classes(["edit-form"]).build();
+        let page = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(8)
+            .css_classes(["edit-form"])
+            .build();
         page.append(&field("Title", &title));
         page.append(&when);
         page.append(&field("Tags", &tags));
@@ -342,8 +418,22 @@ impl Ui {
         page.append(&notes_scroll);
         page.append(&error);
         page.append(&buttons);
-        page.append(&label("Enter saves · Ctrl+Enter saves from notes · Esc cancels", &["form-hint"]));
-        EditForm { page, title, date, time, priority, tags, notes, error, save, cancel }
+        page.append(&label(
+            "Enter saves · Ctrl+Enter saves from notes · Esc cancels",
+            &["form-hint"],
+        ));
+        EditForm {
+            page,
+            title,
+            date,
+            time,
+            priority,
+            tags,
+            notes,
+            error,
+            save,
+            cancel,
+        }
     }
 
     // ───────────────────────────── wiring ─────────────────────────────
@@ -501,7 +591,11 @@ impl Ui {
     }
 
     fn on_key_normal(self: &Rc<Self>, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {
-        if mods.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK | gdk::ModifierType::SUPER_MASK) {
+        if mods.intersects(
+            gdk::ModifierType::CONTROL_MASK
+                | gdk::ModifierType::ALT_MASK
+                | gdk::ModifierType::SUPER_MASK,
+        ) {
             return glib::Propagation::Proceed;
         }
         self.reset_status();
@@ -645,7 +739,11 @@ impl Ui {
         {
             let mut s = self.state.borrow_mut();
             // Clicking the selected day again returns to the Today view.
-            s.selected = if s.selected == Some(date) { None } else { Some(date) };
+            s.selected = if s.selected == Some(date) {
+                None
+            } else {
+                Some(date)
+            };
             s.month = layout::first_of_month(date);
             s.search = None;
         }
@@ -707,9 +805,14 @@ impl Ui {
     }
 
     fn trash_selected(self: &Rc<Self>) {
-        let Some(id) = self.selected_task_id() else { return };
+        let Some(id) = self.selected_task_id() else {
+            return;
+        };
         match self.db.get_task(id) {
-            Ok(Some(t)) => self.perform(Action::Delete(id), format!("Trashed {}", format::quoted(&t.title))),
+            Ok(Some(t)) => self.perform(
+                Action::Delete(id),
+                format!("Trashed {}", format::quoted(&t.title)),
+            ),
             Ok(None) => self.refresh(),
             Err(e) => self.set_status(&format!("Database error: {e:#}"), true),
         }
@@ -718,7 +821,10 @@ impl Ui {
     /// Apply `action`, remember its inverse for undo, refresh.
     fn perform(self: &Rc<Self>, action: Action, label: String) {
         let result = (|| -> Result<()> {
-            let before = self.db.get_task(action.task_id())?.context("task no longer exists")?;
+            let before = self
+                .db
+                .get_task(action.task_id())?
+                .context("task no longer exists")?;
             let inverse = action.inverse(&before);
             action.apply(&self.db)?;
             self.state.borrow_mut().undo.push(label.clone(), inverse);
@@ -858,13 +964,22 @@ impl Ui {
                     let mut s = self.state.borrow_mut();
                     s.mode = Mode::Normal;
                     s.task_sel = Some(task.id);
-                    s.undo.push(format!("Added {}", format::quoted(&title)), Action::Delete(task.id));
+                    s.undo.push(
+                        format!("Added {}", format::quoted(&title)),
+                        Action::Delete(task.id),
+                    );
                 }
                 self.hide_bar();
                 self.set_pane(Pane::Right);
                 self.refresh();
-                let when = task.due_date.map(|d| format!(" (due {})", d.format("%a %-d %b"))).unwrap_or_default();
-                self.set_status(&format!("Added {}{when} — u to undo", format::quoted(&title)), false);
+                let when = task
+                    .due_date
+                    .map(|d| format!(" (due {})", d.format("%a %-d %b")))
+                    .unwrap_or_default();
+                self.set_status(
+                    &format!("Added {}{when} — u to undo", format::quoted(&title)),
+                    false,
+                );
             }
             Err(e) => self.set_status(&format!("{e:#}"), true),
         }
@@ -873,7 +988,9 @@ impl Ui {
     // ───────────────────────────── edit form ─────────────────────────────
 
     fn enter_edit(self: &Rc<Self>) {
-        let Some(id) = self.selected_task_id() else { return };
+        let Some(id) = self.selected_task_id() else {
+            return;
+        };
         let task = match self.db.get_task(id) {
             Ok(Some(t)) => t,
             Ok(None) => return self.refresh(),
@@ -885,7 +1002,8 @@ impl Ui {
         f.date.set_text(&input.date);
         f.time.set_text(&input.time);
         f.tags.set_text(&input.tags);
-        f.priority.set_selected(form::priority_index(input.priority));
+        f.priority
+            .set_selected(form::priority_index(input.priority));
         f.notes.buffer().set_text(&input.notes);
         f.error.set_visible(false);
         self.state.borrow_mut().mode = Mode::Edit(id);
@@ -932,10 +1050,11 @@ impl Ui {
             Ok(None) => return fail("This task no longer exists"),
             Err(e) => return fail(&format!("{e:#}")),
         };
-        let patch: Option<TaskPatch> = match form::build_patch(&task, &self.read_form(), Local::now().naive_local()) {
-            Ok(p) => p,
-            Err(msg) => return fail(&msg),
-        };
+        let patch: Option<TaskPatch> =
+            match form::build_patch(&task, &self.read_form(), Local::now().naive_local()) {
+                Ok(p) => p,
+                Err(msg) => return fail(&msg),
+            };
         let Some(patch) = patch else {
             return self.leave_edit();
         };
@@ -943,9 +1062,15 @@ impl Ui {
         let inverse = action.inverse(&task);
         match action.apply(&self.db) {
             Ok(updated) => {
-                self.state.borrow_mut().undo.push(format!("Edited {}", format::quoted(&task.title)), inverse);
+                self.state
+                    .borrow_mut()
+                    .undo
+                    .push(format!("Edited {}", format::quoted(&task.title)), inverse);
                 self.leave_edit();
-                self.set_status(&format!("Edited {} — u to undo", format::quoted(&updated.title)), false);
+                self.set_status(
+                    &format!("Edited {} — u to undo", format::quoted(&updated.title)),
+                    false,
+                );
             }
             Err(e) => fail(&format!("{e:#}")),
         }

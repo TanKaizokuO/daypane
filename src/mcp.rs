@@ -120,7 +120,11 @@ fn parse_time(field: &str, s: &str) -> Result<NaiveTime, String> {
 fn list(db: &Db, p: ListTasksParams, today: NaiveDate) -> Result<TaskList, String> {
     let filter = TaskFilter {
         status: p.status.unwrap_or_default(),
-        date: p.date.as_deref().map(|s| parse_date("date", s)).transpose()?,
+        date: p
+            .date
+            .as_deref()
+            .map(|s| parse_date("date", s))
+            .transpose()?,
         overdue: p.overdue.unwrap_or(false),
         today: Some(today),
         tag: p.tag,
@@ -128,14 +132,25 @@ fn list(db: &Db, p: ListTasksParams, today: NaiveDate) -> Result<TaskList, Strin
         ..Default::default()
     };
     let tasks = db.list_tasks(&filter).map_err(fail)?;
-    Ok(TaskList { count: tasks.len(), tasks })
+    Ok(TaskList {
+        count: tasks.len(),
+        tasks,
+    })
 }
 
 fn create(db: &Db, p: CreateTaskParams) -> Result<Task, String> {
     let new = NewTask {
         title: p.title,
-        due_date: p.due_date.as_deref().map(|s| parse_date("due_date", s)).transpose()?,
-        due_time: p.due_time.as_deref().map(|s| parse_time("due_time", s)).transpose()?,
+        due_date: p
+            .due_date
+            .as_deref()
+            .map(|s| parse_date("due_date", s))
+            .transpose()?,
+        due_time: p
+            .due_time
+            .as_deref()
+            .map(|s| parse_time("due_time", s))
+            .transpose()?,
         notes: p.notes.unwrap_or_default(),
         priority: p.priority.unwrap_or_default(),
         tags: p.tags.unwrap_or_default(),
@@ -177,7 +192,10 @@ struct TaskServer {
 
 impl TaskServer {
     fn new(db: Db) -> Self {
-        Self { db: Arc::new(Mutex::new(db)), tool_router: Self::tool_router() }
+        Self {
+            db: Arc::new(Mutex::new(db)),
+            tool_router: Self::tool_router(),
+        }
     }
 
     fn db(&self) -> MutexGuard<'_, Db> {
@@ -192,7 +210,10 @@ impl TaskServer {
         description = "List tasks, ordered by due date/time then priority. Default: open tasks. \
                        Filters combine with AND."
     )]
-    fn list_tasks(&self, Parameters(p): Parameters<ListTasksParams>) -> Result<Json<TaskList>, String> {
+    fn list_tasks(
+        &self,
+        Parameters(p): Parameters<ListTasksParams>,
+    ) -> Result<Json<TaskList>, String> {
         list(&self.db(), p, Local::now().date_naive()).map(Json)
     }
 
@@ -206,7 +227,10 @@ impl TaskServer {
     }
 
     #[tool(description = "Create a task. Returns the created task.")]
-    fn create_task(&self, Parameters(p): Parameters<CreateTaskParams>) -> Result<Json<Task>, String> {
+    fn create_task(
+        &self,
+        Parameters(p): Parameters<CreateTaskParams>,
+    ) -> Result<Json<Task>, String> {
         create(&self.db(), p).map(Json)
     }
 
@@ -215,7 +239,10 @@ impl TaskServer {
                        Pass due_date: null to clear the due date (this also clears due_time), \
                        due_time: null to clear only the time. Returns the updated task."
     )]
-    fn update_task(&self, Parameters(p): Parameters<UpdateTaskParams>) -> Result<Json<Task>, String> {
+    fn update_task(
+        &self,
+        Parameters(p): Parameters<UpdateTaskParams>,
+    ) -> Result<Json<Task>, String> {
         update(&self.db(), p).map(Json)
     }
 
@@ -229,7 +256,9 @@ impl TaskServer {
         self.db().reopen_task(p.id).map(Json).map_err(fail)
     }
 
-    #[tool(description = "Move a task to trash (soft delete; undo with restore_task). Returns the task.")]
+    #[tool(
+        description = "Move a task to trash (soft delete; undo with restore_task). Returns the task."
+    )]
     fn delete_task(&self, Parameters(p): Parameters<IdParams>) -> Result<Json<Task>, String> {
         self.db().delete_task(p.id).map(Json).map_err(fail)
     }
@@ -244,7 +273,10 @@ impl TaskServer {
 impl ServerHandler for TaskServer {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(rmcp::model::Implementation::new(APP_NAME, env!("CARGO_PKG_VERSION")))
+            .with_server_info(rmcp::model::Implementation::new(
+                APP_NAME,
+                env!("CARGO_PKG_VERSION"),
+            ))
             .with_instructions(INSTRUCTIONS)
     }
 }
@@ -327,31 +359,64 @@ mod tests {
 
         // Absent fields are untouched.
         let u = update(&db, params(serde_json::json!({"id": t.id, "title": "y"}))).unwrap();
-        assert_eq!((u.title.as_str(), u.due_date, u.priority), ("y", t.due_date, Priority::High));
+        assert_eq!(
+            (u.title.as_str(), u.due_date, u.priority),
+            ("y", t.due_date, Priority::High)
+        );
         assert_eq!(u.due_time, t.due_time);
 
         // null clears only the time.
-        let u = update(&db, params(serde_json::json!({"id": t.id, "due_time": null}))).unwrap();
+        let u = update(
+            &db,
+            params(serde_json::json!({"id": t.id, "due_time": null})),
+        )
+        .unwrap();
         assert_eq!((u.due_date, u.due_time), (t.due_date, None));
 
         // null date clears both.
-        update(&db, params(serde_json::json!({"id": t.id, "due_time": "08:00"}))).unwrap();
-        let u = update(&db, params(serde_json::json!({"id": t.id, "due_date": null}))).unwrap();
+        update(
+            &db,
+            params(serde_json::json!({"id": t.id, "due_time": "08:00"})),
+        )
+        .unwrap();
+        let u = update(
+            &db,
+            params(serde_json::json!({"id": t.id, "due_date": null})),
+        )
+        .unwrap();
         assert_eq!((u.due_date, u.due_time), (None, None));
     }
 
     #[test]
     fn errors_are_strings_not_panics() {
         let db = Db::open_in_memory().unwrap();
-        assert!(update(&db, params(serde_json::json!({"id": 99, "title": "a"}))).unwrap_err().contains("99"));
-        assert!(update(&db, params(serde_json::json!({"id": 99}))).unwrap_err().contains("no fields"));
+        assert!(
+            update(&db, params(serde_json::json!({"id": 99, "title": "a"})))
+                .unwrap_err()
+                .contains("99")
+        );
+        assert!(update(&db, params(serde_json::json!({"id": 99})))
+            .unwrap_err()
+            .contains("no fields"));
         let t = new_task(&db, "a", None);
-        let e = update(&db, params(serde_json::json!({"id": t.id, "due_date": "20/11/2026"}))).unwrap_err();
+        let e = update(
+            &db,
+            params(serde_json::json!({"id": t.id, "due_date": "20/11/2026"})),
+        )
+        .unwrap_err();
         assert!(e.contains("YYYY-MM-DD"), "{e}");
-        let e = update(&db, params(serde_json::json!({"id": t.id, "due_time": "9am"}))).unwrap_err();
+        let e = update(
+            &db,
+            params(serde_json::json!({"id": t.id, "due_time": "9am"})),
+        )
+        .unwrap_err();
         assert!(e.contains("HH:MM"), "{e}");
         // due_time on an undated task is rejected by the store.
-        let e = update(&db, params(serde_json::json!({"id": t.id, "due_time": "09:00"}))).unwrap_err();
+        let e = update(
+            &db,
+            params(serde_json::json!({"id": t.id, "due_time": "09:00"})),
+        )
+        .unwrap_err();
         assert!(e.contains("due_time"), "{e}");
         let e = create(
             &db,
@@ -383,30 +448,83 @@ mod tests {
         assert_eq!(open.count, 2);
         assert_eq!(ids(open), vec![past.id, today.id]);
 
-        let overdue = list(&db, ListTasksParams { overdue: Some(true), ..Default::default() }, now).unwrap();
+        let overdue = list(
+            &db,
+            ListTasksParams {
+                overdue: Some(true),
+                ..Default::default()
+            },
+            now,
+        )
+        .unwrap();
         assert_eq!(ids(overdue), vec![past.id]);
 
-        let by_date = list(&db, ListTasksParams { date: Some("2026-11-13".into()), ..Default::default() }, now).unwrap();
+        let by_date = list(
+            &db,
+            ListTasksParams {
+                date: Some("2026-11-13".into()),
+                ..Default::default()
+            },
+            now,
+        )
+        .unwrap();
         assert_eq!(ids(by_date), vec![today.id]);
 
-        let done = list(&db, ListTasksParams { status: Some(Status::Completed), ..Default::default() }, now).unwrap();
+        let done = list(
+            &db,
+            ListTasksParams {
+                status: Some(Status::Completed),
+                ..Default::default()
+            },
+            now,
+        )
+        .unwrap();
         assert_eq!(ids(done), vec![inbox.id]);
 
-        let q = list(&db, ListTasksParams { query: Some("REPORT".into()), ..Default::default() }, now).unwrap();
+        let q = list(
+            &db,
+            ListTasksParams {
+                query: Some("REPORT".into()),
+                ..Default::default()
+            },
+            now,
+        )
+        .unwrap();
         assert_eq!(ids(q), vec![today.id]);
 
         db.delete_task(past.id).unwrap();
-        let trash = list(&db, ListTasksParams { status: Some(Status::Deleted), ..Default::default() }, now).unwrap();
+        let trash = list(
+            &db,
+            ListTasksParams {
+                status: Some(Status::Deleted),
+                ..Default::default()
+            },
+            now,
+        )
+        .unwrap();
         assert_eq!(ids(trash), vec![past.id]);
 
-        let e = list(&db, ListTasksParams { date: Some("tomorrow".into()), ..Default::default() }, now).unwrap_err();
+        let e = list(
+            &db,
+            ListTasksParams {
+                date: Some("tomorrow".into()),
+                ..Default::default()
+            },
+            now,
+        )
+        .unwrap_err();
         assert!(e.contains("YYYY-MM-DD"));
     }
 
     #[test]
     fn exposes_exactly_the_spec_tools() {
         let server = TaskServer::new(Db::open_in_memory().unwrap());
-        let mut names: Vec<String> = server.tool_router.list_all().into_iter().map(|t| t.name.to_string()).collect();
+        let mut names: Vec<String> = server
+            .tool_router
+            .list_all()
+            .into_iter()
+            .map(|t| t.name.to_string())
+            .collect();
         names.sort();
         assert_eq!(
             names,

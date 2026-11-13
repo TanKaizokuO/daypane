@@ -9,7 +9,7 @@
 Public, open-source Waybar popup: **Google Calendar (read-only) on the left, a local task list on the right**, with the task list drivable by AI agents over MCP. Differentiator vs Waycal/mycal: real Google integration done right + agent-native tasks.
 
 ## Stack
-- Rust, single binary, subcommands: `popup | daemon | mcp | install | add | today | next | done | ls`.
+- Rust, single binary, subcommands: `popup | daemon | mcp | install | login | calendars | add | today | next | done | reopen | rm | restore | ls`.
 - gtk4-rs + gtk4-layer-shell; rusqlite (WAL); `rmcp` (official Rust MCP SDK).
 - Paths via XDG: `$XDG_CONFIG_HOME/$APP/config.toml`, `$XDG_DATA_HOME/$APP/$APP.db`, `$XDG_CONFIG_HOME/$APP/style.css`.
 
@@ -55,7 +55,8 @@ Public, open-source Waybar popup: **Google Calendar (read-only) on the left, a l
 - Daemon writes Waybar JSON (`return-type: json`): text = next-event countdown, else open-task count; tooltip = today's agenda; class `overdue` when overdue tasks exist. Left-click toggles popup.
 
 ## CLI
-- `$APP add "<capture syntax>"`, `$APP today`, `$APP next`, `$APP done <id>`, `$APP ls [filters]`.
+- `$APP add "<capture syntax>"`, `$APP today`, `$APP next`, `$APP done <id>`, `$APP reopen <id>`, `$APP rm <id>` (trash), `$APP restore <id>`, `$APP ls [filters]`.
+- `$APP login` (Google OAuth), `$APP calendars [--select|--deselect <id|name>]` (calendar selection).
 
 ## Deferred (not v1)
 Google writes, CalDAV, week view, multiple accounts, pywal/Matugen adapters, .ics import/export, recurrence, subtasks, projects/lists.

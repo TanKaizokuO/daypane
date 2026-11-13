@@ -75,9 +75,16 @@ pub fn login() -> Result<()> {
     let calendars = db.calendars()?;
     println!("Found {} calendar(s):", calendars.len());
     for c in &calendars {
-        println!("  [{}] {}  ({})", if c.selected { "x" } else { " " }, c.summary, c.id);
+        println!(
+            "  [{}] {}  ({})",
+            if c.selected { "x" } else { " " },
+            c.summary,
+            c.id
+        );
     }
-    println!("\nChoose which are shown with `{APP_NAME} calendars --select <id>` / `--deselect <id>`.");
+    println!(
+        "\nChoose which are shown with `{APP_NAME} calendars --select <id>` / `--deselect <id>`."
+    );
     Ok(())
 }
 
@@ -87,8 +94,12 @@ pub fn login() -> Result<()> {
 /// Returns `Ok(false)` when not configured (no `client_id`) or not logged in (no refresh token),
 /// `Ok(true)` after a sync. Blocking; see the module docs for async callers.
 pub fn sync_all(db: &Db, cfg: &Config) -> Result<bool> {
-    let Some(client) = oauth::Client::from_config(cfg) else { return Ok(false) };
-    let Some(refresh_token) = secret::load_refresh_token()? else { return Ok(false) };
+    let Some(client) = oauth::Client::from_config(cfg) else {
+        return Ok(false);
+    };
+    let Some(refresh_token) = secret::load_refresh_token()? else {
+        return Ok(false);
+    };
     let access_token = oauth::refresh_access_token(client, &refresh_token)?;
     sync_with(db, &api::GoogleBackend::new(access_token))?;
     Ok(true)
@@ -108,10 +119,18 @@ fn sync_with(db: &Db, backend: &dyn CalendarBackend) -> Result<()> {
         .calendars()?
         .iter()
         .filter(|c| c.selected)
-        .filter_map(|c| sync_calendar(db, backend, c).err().map(|e| format!("{}: {e:#}", c.summary)))
+        .filter_map(|c| {
+            sync_calendar(db, backend, c)
+                .err()
+                .map(|e| format!("{}: {e:#}", c.summary))
+        })
         .collect();
     if !failures.is_empty() {
-        bail!("sync failed for {} calendar(s): {}", failures.len(), failures.join("; "));
+        bail!(
+            "sync failed for {} calendar(s): {}",
+            failures.len(),
+            failures.join("; ")
+        );
     }
     Ok(())
 }
@@ -133,7 +152,12 @@ fn sync_calendar(db: &Db, backend: &dyn CalendarBackend, cal: &Calendar) -> Resu
 }
 
 /// Returns `false` on 410 Gone. The new sync token is stored only after the final page.
-fn run_sync(db: &Db, backend: &dyn CalendarBackend, calendar_id: &str, token: Option<&str>) -> Result<bool> {
+fn run_sync(
+    db: &Db,
+    backend: &dyn CalendarBackend,
+    calendar_id: &str,
+    token: Option<&str>,
+) -> Result<bool> {
     let outcome = backend.sync_events(calendar_id, token, &mut |changes| {
         for change in changes {
             match change {
@@ -189,8 +213,15 @@ mod tests {
             sync_token: Option<&str>,
             on_page: &mut dyn FnMut(Vec<EventChange>) -> Result<()>,
         ) -> Result<SyncOutcome> {
-            self.calls.borrow_mut().push((calendar_id.to_owned(), sync_token.map(str::to_owned)));
-            match self.scripts.borrow_mut().pop_front().expect("unscripted sync_events call") {
+            self.calls
+                .borrow_mut()
+                .push((calendar_id.to_owned(), sync_token.map(str::to_owned)));
+            match self
+                .scripts
+                .borrow_mut()
+                .pop_front()
+                .expect("unscripted sync_events call")
+            {
                 Script::Gone => Ok(SyncOutcome::Gone),
                 Script::FailAfter(page) => {
                     on_page(page)?;
@@ -200,14 +231,21 @@ mod tests {
                     for p in pages {
                         on_page(p)?;
                     }
-                    Ok(SyncOutcome::Complete { next_sync_token: Some(token.to_owned()) })
+                    Ok(SyncOutcome::Complete {
+                        next_sync_token: Some(token.to_owned()),
+                    })
                 }
             }
         }
     }
 
     fn cal(id: &str) -> RemoteCalendar {
-        RemoteCalendar { id: id.into(), summary: format!("Cal {id}"), color: None, default_reminders: vec![] }
+        RemoteCalendar {
+            id: id.into(),
+            summary: format!("Cal {id}"),
+            color: None,
+            default_reminders: vec![],
+        }
     }
 
     fn ev(cal: &str, id: &str, start: i64) -> EventChange {
@@ -228,13 +266,23 @@ mod tests {
     }
 
     fn ids(db: &Db) -> Vec<String> {
-        let mut v: Vec<_> = db.events_between(0, i64::MAX).unwrap().into_iter().map(|e| e.id).collect();
+        let mut v: Vec<_> = db
+            .events_between(0, i64::MAX)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
         v.sort();
         v
     }
 
     fn token(db: &Db, id: &str) -> Option<String> {
-        db.calendars().unwrap().into_iter().find(|c| c.id == id).unwrap().sync_token
+        db.calendars()
+            .unwrap()
+            .into_iter()
+            .find(|c| c.id == id)
+            .unwrap()
+            .sync_token
     }
 
     #[test]
@@ -243,8 +291,14 @@ mod tests {
         let fake = Fake::default();
         fake.calendars.borrow_mut().push(cal("a"));
         fake.scripts.borrow_mut().extend([
-            Script::Pages(vec![vec![ev("a", "1", 1000)], vec![ev("a", "2", 2000)]], "T1"),
-            Script::Pages(vec![vec![EventChange::Delete("1".into()), ev("a", "3", 3000)]], "T2"),
+            Script::Pages(
+                vec![vec![ev("a", "1", 1000)], vec![ev("a", "2", 2000)]],
+                "T1",
+            ),
+            Script::Pages(
+                vec![vec![EventChange::Delete("1".into()), ev("a", "3", 3000)]],
+                "T2",
+            ),
         ]);
 
         sync_with(&db, &fake).unwrap();
@@ -256,7 +310,10 @@ mod tests {
         assert_eq!(token(&db, "a").as_deref(), Some("T2"));
         assert_eq!(
             *fake.calls.borrow(),
-            [("a".to_owned(), None), ("a".to_owned(), Some("T1".to_owned()))]
+            [
+                ("a".to_owned(), None),
+                ("a".to_owned(), Some("T1".to_owned()))
+            ]
         );
     }
 
@@ -266,16 +323,26 @@ mod tests {
         let fake = Fake::default();
         fake.calendars.borrow_mut().push(cal("a"));
         fake.scripts.borrow_mut().extend([
-            Script::Pages(vec![vec![ev("a", "stale", 1000), ev("a", "keep", 2000)]], "OLD"),
+            Script::Pages(
+                vec![vec![ev("a", "stale", 1000), ev("a", "keep", 2000)]],
+                "OLD",
+            ),
             Script::Gone,
-            Script::Pages(vec![vec![ev("a", "keep", 2000), ev("a", "new", 3000)]], "NEW"),
+            Script::Pages(
+                vec![vec![ev("a", "keep", 2000), ev("a", "new", 3000)]],
+                "NEW",
+            ),
         ]);
 
         sync_with(&db, &fake).unwrap();
         assert_eq!(ids(&db), ["keep", "stale"]);
 
         sync_with(&db, &fake).unwrap();
-        assert_eq!(ids(&db), ["keep", "new"], "stale event must not survive a 410 resync");
+        assert_eq!(
+            ids(&db),
+            ["keep", "new"],
+            "stale event must not survive a 410 resync"
+        );
         assert_eq!(token(&db, "a").as_deref(), Some("NEW"));
         assert_eq!(
             *fake.calls.borrow(),
@@ -292,10 +359,15 @@ mod tests {
         let db = Db::open_in_memory().unwrap();
         let fake = Fake::default();
         fake.calendars.borrow_mut().push(cal("a"));
-        fake.scripts.borrow_mut().push_back(Script::FailAfter(vec![ev("a", "1", 1000)]));
+        fake.scripts
+            .borrow_mut()
+            .push_back(Script::FailAfter(vec![ev("a", "1", 1000)]));
 
         let err = sync_with(&db, &fake).unwrap_err().to_string();
-        assert!(err.contains("network down") && err.contains("Cal a"), "{err}");
+        assert!(
+            err.contains("network down") && err.contains("Cal a"),
+            "{err}"
+        );
         assert_eq!(token(&db, "a"), None);
         assert_eq!(ids(&db), ["1"], "pages already delivered are persisted");
     }
@@ -306,28 +378,42 @@ mod tests {
         let fake = Fake::default();
         fake.calendars.borrow_mut().push(cal("a"));
         fake.scripts.borrow_mut().push_back(Script::Gone);
-        assert!(sync_with(&db, &fake).unwrap_err().to_string().contains("410"));
+        assert!(sync_with(&db, &fake)
+            .unwrap_err()
+            .to_string()
+            .contains("410"));
     }
 
     #[test]
     fn only_selected_calendars_sync_and_removed_ones_are_dropped() {
         let db = Db::open_in_memory().unwrap();
         let fake = Fake::default();
-        fake.calendars.borrow_mut().extend([cal("a"), cal("b"), cal("gone")]);
+        fake.calendars
+            .borrow_mut()
+            .extend([cal("a"), cal("b"), cal("gone")]);
         db.upsert_calendar("a", "Cal a", None, &[]).unwrap();
         db.upsert_calendar("b", "Cal b", None, &[]).unwrap();
         db.set_calendar_selected("b", false).unwrap();
-        fake.scripts.borrow_mut().push_back(Script::Pages(vec![vec![ev("a", "1", 1000)]], "TA"));
+        fake.scripts
+            .borrow_mut()
+            .push_back(Script::Pages(vec![vec![ev("a", "1", 1000)]], "TA"));
         // "gone" is selected by default and syncs too; it is removed in the second run.
-        fake.scripts.borrow_mut().push_back(Script::Pages(vec![vec![ev("gone", "g", 1000)]], "TG"));
+        fake.scripts
+            .borrow_mut()
+            .push_back(Script::Pages(vec![vec![ev("gone", "g", 1000)]], "TG"));
 
         sync_with(&db, &fake).unwrap();
         let synced: Vec<_> = fake.calls.borrow().iter().map(|(c, _)| c.clone()).collect();
         assert!(synced.contains(&"a".to_owned()) && synced.contains(&"gone".to_owned()));
-        assert!(!synced.contains(&"b".to_owned()), "deselected calendar must not be synced");
+        assert!(
+            !synced.contains(&"b".to_owned()),
+            "deselected calendar must not be synced"
+        );
 
         fake.calendars.borrow_mut().retain(|c| c.id != "gone");
-        fake.scripts.borrow_mut().push_back(Script::Pages(vec![], "TA2"));
+        fake.scripts
+            .borrow_mut()
+            .push_back(Script::Pages(vec![], "TA2"));
         sync_with(&db, &fake).unwrap();
         let remaining: Vec<_> = db.calendars().unwrap().into_iter().map(|c| c.id).collect();
         assert_eq!(remaining, ["a", "b"]);
@@ -340,8 +426,12 @@ mod tests {
         let fake = Fake::default();
         fake.calendars.borrow_mut().extend([cal("a"), cal("b")]);
         // Calendars sync in summary order: a fails, b succeeds.
-        fake.scripts.borrow_mut().push_back(Script::FailAfter(vec![]));
-        fake.scripts.borrow_mut().push_back(Script::Pages(vec![vec![ev("b", "1", 1000)]], "TB"));
+        fake.scripts
+            .borrow_mut()
+            .push_back(Script::FailAfter(vec![]));
+        fake.scripts
+            .borrow_mut()
+            .push_back(Script::Pages(vec![vec![ev("b", "1", 1000)]], "TB"));
 
         assert!(sync_with(&db, &fake).is_err());
         assert_eq!(token(&db, "a"), None);

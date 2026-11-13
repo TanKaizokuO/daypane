@@ -72,7 +72,19 @@ CREATE TABLE IF NOT EXISTS fired_reminders (
 
 // ─── Tasks ──────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Priority {
     #[default]
@@ -93,15 +105,6 @@ impl Priority {
             3 => Self::High,
             _ => Self::None,
         }
-    }
-    pub fn parse(s: &str) -> Option<Self> {
-        Some(match s.to_ascii_lowercase().as_str() {
-            "none" => Self::None,
-            "low" => Self::Low,
-            "med" | "medium" => Self::Med,
-            "high" => Self::High,
-            _ => return None,
-        })
     }
 }
 
@@ -130,6 +133,7 @@ impl Task {
     pub fn is_open(&self) -> bool {
         self.completed_at.is_none() && self.deleted_at.is_none()
     }
+    #[cfg_attr(not(feature = "gui"), allow(dead_code))] // used by the popup
     pub fn is_overdue(&self, today: NaiveDate) -> bool {
         self.is_open() && self.due_date.is_some_and(|d| d < today)
     }
@@ -160,7 +164,9 @@ pub struct TaskPatch {
     pub links: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Status {
     /// Not completed, not deleted.
@@ -282,19 +288,25 @@ fn task_from_row(r: &Row) -> rusqlite::Result<Task> {
         i: usize,
         v: std::result::Result<T, E>,
     ) -> rusqlite::Result<T> {
-        v.map_err(|e| rusqlite::Error::FromSqlConversionFailure(i, rusqlite::types::Type::Text, Box::new(e)))
+        v.map_err(|e| {
+            rusqlite::Error::FromSqlConversionFailure(i, rusqlite::types::Type::Text, Box::new(e))
+        })
     }
     let date = |i: usize, s: Option<String>| -> rusqlite::Result<Option<NaiveDate>> {
-        s.map(|s| parse(i, NaiveDate::parse_from_str(&s, "%Y-%m-%d"))).transpose()
+        s.map(|s| parse(i, NaiveDate::parse_from_str(&s, "%Y-%m-%d")))
+            .transpose()
     };
     let time = |i: usize, s: Option<String>| -> rusqlite::Result<Option<NaiveTime>> {
-        s.map(|s| parse(i, NaiveTime::parse_from_str(&s, "%H:%M"))).transpose()
+        s.map(|s| parse(i, NaiveTime::parse_from_str(&s, "%H:%M")))
+            .transpose()
     };
     let stamp = |i: usize, s: Option<String>| -> rusqlite::Result<Option<DateTime<Utc>>> {
         s.map(|s| parse(i, DateTime::parse_from_rfc3339(&s)).map(|d| d.with_timezone(&Utc)))
             .transpose()
     };
-    let list = |i: usize, s: String| -> rusqlite::Result<Vec<String>> { parse(i, serde_json::from_str(&s)) };
+    let list = |i: usize, s: String| -> rusqlite::Result<Vec<String>> {
+        parse(i, serde_json::from_str(&s))
+    };
     Ok(Task {
         id: r.get(0)?,
         title: r.get(1)?,
@@ -335,7 +347,8 @@ const EVENT_COLS: &str = "e.calendar_id, e.id, e.summary, e.description, e.locat
                           e.start_ts, e.end_ts, e.meet_link, e.html_link, e.use_default_reminders, e.reminders";
 
 /// Sort: dated before undated; by date, time (untimed last within a day), priority desc, id.
-const TASK_ORDER: &str = "ORDER BY due_date IS NULL, due_date, due_time IS NULL, due_time, priority DESC, id";
+const TASK_ORDER: &str =
+    "ORDER BY due_date IS NULL, due_date, due_time IS NULL, due_time, priority DESC, id";
 
 impl Db {
     /// Open the default XDG database, creating directories and schema as needed.
@@ -368,12 +381,15 @@ impl Db {
     }
 
     fn migrate(&self) -> Result<()> {
-        let v: i64 = self.conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
+        let v: i64 = self
+            .conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))?;
         if v > SCHEMA_VERSION {
             bail!("database schema v{v} is newer than this binary (v{SCHEMA_VERSION})");
         }
         self.conn.execute_batch(SCHEMA)?;
-        self.conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        self.conn
+            .pragma_update(None, "user_version", SCHEMA_VERSION)?;
         Ok(())
     }
 
@@ -403,12 +419,17 @@ impl Db {
     pub fn get_task(&self, id: i64) -> Result<Option<Task>> {
         Ok(self
             .conn
-            .query_row(&format!("SELECT {TASK_COLS} FROM tasks WHERE id = ?1"), [id], task_from_row)
+            .query_row(
+                &format!("SELECT {TASK_COLS} FROM tasks WHERE id = ?1"),
+                [id],
+                task_from_row,
+            )
             .optional()?)
     }
 
     fn task_or_err(&self, id: i64) -> Result<Task> {
-        self.get_task(id)?.with_context(|| format!("no task with id {id}"))
+        self.get_task(id)?
+            .with_context(|| format!("no task with id {id}"))
     }
 
     pub fn update_task(&self, id: i64, p: TaskPatch) -> Result<Task> {
@@ -478,9 +499,10 @@ impl Db {
     /// Permanently remove tasks trashed more than [`TRASH_RETENTION_DAYS`] ago. Returns count.
     pub fn purge_trash(&self) -> Result<usize> {
         let cutoff = ts(now() - chrono::Duration::days(TRASH_RETENTION_DAYS));
-        Ok(self
-            .conn
-            .execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?1", [cutoff])?)
+        Ok(self.conn.execute(
+            "DELETE FROM tasks WHERE deleted_at IS NOT NULL AND deleted_at < ?1",
+            [cutoff],
+        )?)
     }
 
     pub fn list_tasks(&self, f: &TaskFilter) -> Result<Vec<Task>> {
@@ -509,10 +531,17 @@ impl Db {
         }
         if let Some(tag) = &f.tag {
             args.push(Box::new(tag.trim().trim_start_matches('#').to_lowercase()));
-            sql.push_str(&format!(" AND EXISTS (SELECT 1 FROM json_each(tasks.tags) WHERE value = ?{})", args.len()));
+            sql.push_str(&format!(
+                " AND EXISTS (SELECT 1 FROM json_each(tasks.tags) WHERE value = ?{})",
+                args.len()
+            ));
         }
         if let Some(q) = f.query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
-            let escaped = q.to_lowercase().replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            let escaped = q
+                .to_lowercase()
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_");
             args.push(Box::new(format!("%{escaped}%")));
             let n = args.len();
             sql.push_str(&format!(
@@ -529,9 +558,19 @@ impl Db {
 
     pub fn today_view(&self, today: NaiveDate) -> Result<TodayView> {
         Ok(TodayView {
-            overdue: self.list_tasks(&TaskFilter { overdue: true, today: Some(today), ..Default::default() })?,
-            due_today: self.list_tasks(&TaskFilter { date: Some(today), ..Default::default() })?,
-            inbox: self.list_tasks(&TaskFilter { undated: true, ..Default::default() })?,
+            overdue: self.list_tasks(&TaskFilter {
+                overdue: true,
+                today: Some(today),
+                ..Default::default()
+            })?,
+            due_today: self.list_tasks(&TaskFilter {
+                date: Some(today),
+                ..Default::default()
+            })?,
+            inbox: self.list_tasks(&TaskFilter {
+                undated: true,
+                ..Default::default()
+            })?,
         })
     }
 
@@ -548,7 +587,13 @@ impl Db {
     // ── calendars ──
 
     /// Insert or update metadata; preserves `selected` and `sync_token` for existing rows.
-    pub fn upsert_calendar(&self, id: &str, summary: &str, color: Option<&str>, default_reminders: &[Reminder]) -> Result<()> {
+    pub fn upsert_calendar(
+        &self,
+        id: &str,
+        summary: &str,
+        color: Option<&str>,
+        default_reminders: &[Reminder],
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO calendars (id, summary, color, default_reminders) VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT(id) DO UPDATE SET summary = excluded.summary, color = excluded.color,
@@ -577,7 +622,11 @@ impl Db {
     }
 
     pub fn set_calendar_selected(&self, id: &str, selected: bool) -> Result<()> {
-        if self.conn.execute("UPDATE calendars SET selected = ?2 WHERE id = ?1", params![id, selected])? == 0 {
+        if self.conn.execute(
+            "UPDATE calendars SET selected = ?2 WHERE id = ?1",
+            params![id, selected],
+        )? == 0
+        {
             bail!("no calendar with id {id}");
         }
         Ok(())
@@ -586,20 +635,25 @@ impl Db {
     /// Remove calendars no longer present upstream (cascades to events).
     pub fn retain_calendars(&self, ids: &[String]) -> Result<()> {
         let keep = json(&ids);
-        self.conn
-            .execute("DELETE FROM calendars WHERE id NOT IN (SELECT value FROM json_each(?1))", [keep])?;
+        self.conn.execute(
+            "DELETE FROM calendars WHERE id NOT IN (SELECT value FROM json_each(?1))",
+            [keep],
+        )?;
         Ok(())
     }
 
     pub fn set_sync_token(&self, calendar_id: &str, token: Option<&str>) -> Result<()> {
-        self.conn
-            .execute("UPDATE calendars SET sync_token = ?2 WHERE id = ?1", params![calendar_id, token])?;
+        self.conn.execute(
+            "UPDATE calendars SET sync_token = ?2 WHERE id = ?1",
+            params![calendar_id, token],
+        )?;
         Ok(())
     }
 
     /// Drop all cached events of a calendar (before a full resync after `410 Gone`).
     pub fn clear_events(&self, calendar_id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM events WHERE calendar_id = ?1", [calendar_id])?;
+        self.conn
+            .execute("DELETE FROM events WHERE calendar_id = ?1", [calendar_id])?;
         Ok(())
     }
 
@@ -629,8 +683,10 @@ impl Db {
     }
 
     pub fn delete_event(&self, calendar_id: &str, id: &str) -> Result<()> {
-        self.conn
-            .execute("DELETE FROM events WHERE calendar_id = ?1 AND id = ?2", params![calendar_id, id])?;
+        self.conn.execute(
+            "DELETE FROM events WHERE calendar_id = ?1 AND id = ?2",
+            params![calendar_id, id],
+        )?;
         Ok(())
     }
 
@@ -652,8 +708,17 @@ impl Db {
     }
 
     /// Case-insensitive substring search over cached events of selected calendars.
+    #[cfg_attr(not(feature = "gui"), allow(dead_code))] // used by the popup
     pub fn search_events(&self, query: &str) -> Result<Vec<Event>> {
-        let q = format!("%{}%", query.trim().to_lowercase().replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
+        let q = format!(
+            "%{}%",
+            query
+                .trim()
+                .to_lowercase()
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_")
+        );
         let mut stmt = self.conn.prepare(&format!(
             "SELECT {EVENT_COLS} FROM events e JOIN calendars c ON c.id = e.calendar_id
              WHERE c.selected AND (lower(e.summary) LIKE ?1 ESCAPE '\\' OR lower(e.description) LIKE ?1 ESCAPE '\\'
@@ -668,14 +733,17 @@ impl Db {
 
     /// Records `key` as fired. Returns false if it already was.
     pub fn mark_fired(&self, key: &str, at: i64) -> Result<bool> {
-        Ok(self
-            .conn
-            .execute("INSERT OR IGNORE INTO fired_reminders (key, fired_at) VALUES (?1, ?2)", params![key, at])?
-            == 1)
+        Ok(self.conn.execute(
+            "INSERT OR IGNORE INTO fired_reminders (key, fired_at) VALUES (?1, ?2)",
+            params![key, at],
+        )? == 1)
     }
 
     pub fn prune_fired(&self, older_than_ts: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM fired_reminders WHERE fired_at < ?1", [older_than_ts])?;
+        self.conn.execute(
+            "DELETE FROM fired_reminders WHERE fired_at < ?1",
+            [older_than_ts],
+        )?;
         Ok(())
     }
 }
@@ -690,7 +758,11 @@ pub fn local_day_bounds(day: NaiveDate) -> (i64, i64) {
             .map(|t| t.timestamp())
             // Midnight skipped by DST: fall back to 01:00.
             .unwrap_or_else(|| {
-                d.and_hms_opt(1, 0, 0).expect("1am").and_local_timezone(chrono::Local).unwrap().timestamp()
+                d.and_hms_opt(1, 0, 0)
+                    .expect("1am")
+                    .and_local_timezone(chrono::Local)
+                    .unwrap()
+                    .timestamp()
             })
     };
     (at(day), at(day.succ_opt().expect("date in range")))
@@ -728,7 +800,11 @@ mod tests {
     }
 
     fn new(title: &str, date: Option<&str>) -> NewTask {
-        NewTask { title: title.into(), due_date: date.map(d), ..Default::default() }
+        NewTask {
+            title: title.into(),
+            due_date: date.map(d),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -743,14 +819,20 @@ mod tests {
         let hi = db.create_task(now_hi).unwrap();
         let timed = db.create_task(now_timed).unwrap();
         let inbox = db.create_task(new("inbox", None)).unwrap();
-        let done = db.create_task(new("done late", Some("2026-11-01"))).unwrap();
+        let done = db
+            .create_task(new("done late", Some("2026-11-01")))
+            .unwrap();
         db.complete_task(done.id).unwrap();
         db.create_task(new("future", Some("2026-11-20"))).unwrap();
 
         let v = db.today_view(today).unwrap();
         let ids = |ts: &[Task]| ts.iter().map(|t| t.id).collect::<Vec<_>>();
         assert_eq!(ids(&v.overdue), [late.id]);
-        assert_eq!(ids(&v.due_today), [timed.id, hi.id], "timed first, then by priority");
+        assert_eq!(
+            ids(&v.due_today),
+            [timed.id, hi.id],
+            "timed first, then by priority"
+        );
         assert_eq!(ids(&v.inbox), [inbox.id]);
     }
 
@@ -763,16 +845,38 @@ mod tests {
         let t = db.create_task(t).unwrap();
         assert_eq!(t.tags, ["errands"], "tags normalized and deduped");
 
-        let by_tag = TaskFilter { tag: Some("ERRANDS".into()), ..Default::default() };
+        let by_tag = TaskFilter {
+            tag: Some("ERRANDS".into()),
+            ..Default::default()
+        };
         assert_eq!(db.list_tasks(&by_tag).unwrap().len(), 1);
-        let q = |s: &str| TaskFilter { query: Some(s.into()), ..Default::default() };
+        let q = |s: &str| TaskFilter {
+            query: Some(s.into()),
+            ..Default::default()
+        };
         assert_eq!(db.list_tasks(&q("milk")).unwrap().len(), 1);
-        assert_eq!(db.list_tasks(&q("%")).unwrap().len(), 1, "literal percent in notes");
-        assert_eq!(db.list_tasks(&q("_")).unwrap().len(), 0, "underscore is literal, not wildcard");
+        assert_eq!(
+            db.list_tasks(&q("%")).unwrap().len(),
+            1,
+            "literal percent in notes"
+        );
+        assert_eq!(
+            db.list_tasks(&q("_")).unwrap().len(),
+            0,
+            "underscore is literal, not wildcard"
+        );
 
         db.delete_task(t.id).unwrap();
         assert!(db.list_tasks(&TaskFilter::default()).unwrap().is_empty());
-        assert_eq!(db.list_tasks(&TaskFilter { status: Status::Deleted, ..Default::default() }).unwrap().len(), 1);
+        assert_eq!(
+            db.list_tasks(&TaskFilter {
+                status: Status::Deleted,
+                ..Default::default()
+            })
+            .unwrap()
+            .len(),
+            1
+        );
         db.restore_task(t.id).unwrap();
         assert_eq!(db.list_tasks(&TaskFilter::default()).unwrap().len(), 1);
     }
@@ -784,7 +888,10 @@ mod tests {
         let fresh = db.create_task(new("fresh", None)).unwrap();
         db.delete_task(fresh.id).unwrap();
         db.conn
-            .execute("UPDATE tasks SET deleted_at = '2000-01-01T00:00:00Z' WHERE id = ?1", [old.id])
+            .execute(
+                "UPDATE tasks SET deleted_at = '2000-01-01T00:00:00Z' WHERE id = ?1",
+                [old.id],
+            )
             .unwrap();
         assert_eq!(db.purge_trash().unwrap(), 1);
         assert!(db.get_task(old.id).unwrap().is_none());
@@ -801,8 +908,20 @@ mod tests {
         let mut t = new("y", Some("2026-11-13"));
         t.due_time = NaiveTime::from_hms_opt(9, 0, 0);
         let t = db.create_task(t).unwrap();
-        let cleared = db.update_task(t.id, TaskPatch { due_date: Some(None), ..Default::default() }).unwrap();
-        assert_eq!((cleared.due_date, cleared.due_time), (None, None), "clearing date clears time");
+        let cleared = db
+            .update_task(
+                t.id,
+                TaskPatch {
+                    due_date: Some(None),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            (cleared.due_date, cleared.due_time),
+            (None, None),
+            "clearing date clears time"
+        );
     }
 
     #[test]
@@ -828,13 +947,21 @@ mod tests {
         db.upsert_event(&ev("a", "touching", 200, 300)).unwrap();
         db.upsert_event(&ev("b", "hidden", 100, 200)).unwrap();
         db.set_calendar_selected("b", false).unwrap();
-        let got: Vec<_> = db.events_between(150, 200).unwrap().into_iter().map(|e| e.id).collect();
+        let got: Vec<_> = db
+            .events_between(150, 200)
+            .unwrap()
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
         assert_eq!(got, ["in"]);
         db.upsert_calendar("a", "A renamed", None, &[]).unwrap();
         db.set_sync_token("a", Some("tok")).unwrap();
         db.retain_calendars(&["a".into()]).unwrap();
         let cals = db.calendars().unwrap();
-        assert_eq!((cals.len(), cals[0].sync_token.as_deref()), (1, Some("tok")));
+        assert_eq!(
+            (cals.len(), cals[0].sync_token.as_deref()),
+            (1, Some("tok"))
+        );
     }
 
     #[test]

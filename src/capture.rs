@@ -129,7 +129,8 @@ pub fn parse(input: &str, now: NaiveDateTime) -> Capture {
             time = time.or_else(|| NaiveTime::from_hms_opt(20, 0, 0));
         }
         Some(DateSpec::Weekday { wd, strict }) => {
-            let delta = (wd.num_days_from_monday() as i64 - today.weekday().num_days_from_monday() as i64)
+            let delta = (wd.num_days_from_monday() as i64
+                - today.weekday().num_days_from_monday() as i64)
                 .rem_euclid(7);
             let later_today = !strict && time.is_some_and(|t| t > now.time());
             let days = if delta == 0 && !later_today { 7 } else { delta };
@@ -137,12 +138,21 @@ pub fn parse(input: &str, now: NaiveDateTime) -> Capture {
         }
         None => {
             if let Some(t) = time {
-                cap.due_date = Some(if t > now.time() { today } else { today + Duration::days(1) });
+                cap.due_date = Some(if t > now.time() {
+                    today
+                } else {
+                    today + Duration::days(1)
+                });
             }
         }
     }
     cap.due_time = if cap.due_date.is_some() { time } else { None };
-    cap.title = toks.iter().filter(|t| !t.used).map(|t| t.raw).collect::<Vec<_>>().join(" ");
+    cap.title = toks
+        .iter()
+        .filter(|t| !t.used)
+        .map(|t| t.raw)
+        .collect::<Vec<_>>()
+        .join(" ");
     cap
 }
 
@@ -161,7 +171,11 @@ impl<'a> Tok<'a> {
             .trim_start_matches('(')
             .trim_end_matches([',', '.', ';', ':', '!', '?', ')'])
             .to_lowercase();
-        Self { raw, norm, used: false }
+        Self {
+            raw,
+            norm,
+            used: false,
+        }
     }
 }
 
@@ -178,7 +192,9 @@ fn word<'a>(toks: &'a [Tok], i: usize) -> Option<&'a str> {
 
 fn as_link(raw: &str) -> Option<String> {
     let lower = raw.to_ascii_lowercase();
-    let scheme = ["https://", "http://"].into_iter().find(|s| lower.starts_with(s))?;
+    let scheme = ["https://", "http://"]
+        .into_iter()
+        .find(|s| lower.starts_with(s))?;
     let mut url = raw.trim_end_matches(['.', ',', ';', ':', '!', '?']);
     if !url.contains('(') {
         url = url.trim_end_matches(')');
@@ -187,9 +203,14 @@ fn as_link(raw: &str) -> Option<String> {
 }
 
 fn as_tag(raw: &str) -> Option<String> {
-    let body = raw.strip_prefix('#')?.trim_end_matches([',', '.', ';', ':', '!', '?']);
-    (!body.is_empty() && body.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-'))
-        .then(|| body.to_lowercase())
+    let body = raw
+        .strip_prefix('#')?
+        .trim_end_matches([',', '.', ';', ':', '!', '?']);
+    (!body.is_empty()
+        && body
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-'))
+    .then(|| body.to_lowercase())
 }
 
 fn as_priority(norm: &str) -> Option<Priority> {
@@ -291,7 +312,11 @@ fn try_date(toks: &[Tok], i: usize, today: NaiveDate) -> Option<(DateSpec, usize
         "in" => {
             let n: Option<u32> = match w1 {
                 Some("a" | "an") => Some(1),
-                Some(n) if !n.is_empty() && n.len() <= 3 && n.bytes().all(|b| b.is_ascii_digit()) => n.parse().ok(),
+                Some(n)
+                    if !n.is_empty() && n.len() <= 3 && n.bytes().all(|b| b.is_ascii_digit()) =>
+                {
+                    n.parse().ok()
+                }
                 _ => None,
             };
             if let (Some(n), Some(unit)) = (n, w2) {
@@ -423,7 +448,10 @@ mod tests {
 
     /// Friday 2026-11-13, 10:00.
     fn now() -> NaiveDateTime {
-        NaiveDate::from_ymd_opt(2026, 11, 13).unwrap().and_hms_opt(10, 0, 0).unwrap()
+        NaiveDate::from_ymd_opt(2026, 11, 13)
+            .unwrap()
+            .and_hms_opt(10, 0, 0)
+            .unwrap()
     }
 
     fn d(y: i32, m: u32, day: u32) -> Option<NaiveDate> {
@@ -457,7 +485,13 @@ mod tests {
     #[test]
     fn plain_title() {
         let c = p("buy milk");
-        assert_eq!(c, Capture { title: "buy milk".into(), ..Default::default() });
+        assert_eq!(
+            c,
+            Capture {
+                title: "buy milk".into(),
+                ..Default::default()
+            }
+        );
     }
 
     #[test]
@@ -467,7 +501,10 @@ mod tests {
         assert_eq!(p("a tmr").due_date, d(2026, 11, 14));
         assert_eq!(p("a tmrw").due_date, d(2026, 11, 14));
         let c = p("call mom tomorrow 9am");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("call mom", d(2026, 11, 14), t(9, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("call mom", d(2026, 11, 14), t(9, 0))
+        );
     }
 
     #[test]
@@ -479,7 +516,10 @@ mod tests {
     #[test]
     fn tonight() {
         let c = p("movie tonight");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("movie", d(2026, 11, 13), t(20, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("movie", d(2026, 11, 13), t(20, 0))
+        );
         let c = p("movie tonight 9pm");
         assert_eq!((c.due_date, c.due_time), (d(2026, 11, 13), t(21, 0)));
     }
@@ -504,7 +544,10 @@ mod tests {
     fn next_weekday_never_means_today() {
         assert_eq!(p("a next fri 5pm").due_date, d(2026, 11, 20));
         let c = p("sync next mon 5pm");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("sync", d(2026, 11, 16), t(17, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("sync", d(2026, 11, 16), t(17, 0))
+        );
     }
 
     #[test]
@@ -517,7 +560,10 @@ mod tests {
         assert_eq!(p("a in 1 month").due_date, d(2026, 12, 13));
         assert_eq!(p("a in 3 months").due_date, d(2027, 2, 13));
         let c = p("a in 3 days at 9");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("a", d(2026, 11, 16), t(9, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("a", d(2026, 11, 16), t(9, 0))
+        );
     }
 
     #[test]
@@ -535,9 +581,15 @@ mod tests {
         assert_eq!(p("a Dec 1st").due_date, d(2026, 12, 1));
         assert_eq!(p("a sept 9").due_date, d(2027, 9, 9));
         let c = p("taxes nov 20 5pm");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("taxes", d(2026, 11, 20), t(17, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("taxes", d(2026, 11, 20), t(17, 0))
+        );
         let c = p("taxes 20 nov 17:30");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("taxes", d(2026, 11, 20), t(17, 30)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("taxes", d(2026, 11, 20), t(17, 30))
+        );
     }
 
     #[test]
@@ -572,7 +624,13 @@ mod tests {
 
     #[test]
     fn ambiguous_words_are_not_dates() {
-        assert_eq!(p("may I buy milk"), Capture { title: "may I buy milk".into(), ..Default::default() });
+        assert_eq!(
+            p("may I buy milk"),
+            Capture {
+                title: "may I buy milk".into(),
+                ..Default::default()
+            }
+        );
         assert_eq!(p("a may 5").due_date, d(2027, 5, 5));
         assert_eq!(p("mar").due_date, None);
         assert_eq!(p("sat").due_date, d(2026, 11, 14));
@@ -584,7 +642,10 @@ mod tests {
     #[test]
     fn month_followed_by_meridiem_is_a_time_not_a_day() {
         let c = p("a mar 5 pm");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("a mar", d(2026, 11, 13), t(17, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("a mar", d(2026, 11, 13), t(17, 0))
+        );
     }
 
     #[test]
@@ -612,7 +673,9 @@ mod tests {
 
     #[test]
     fn invalid_times_stay_in_title() {
-        for s in ["a 13pm", "a 0pm", "a 25:00", "a 9:61", "a 9:5", "a 17", "a 5.30pm"] {
+        for s in [
+            "a 13pm", "a 0pm", "a 25:00", "a 9:61", "a 9:5", "a 17", "a 5.30pm",
+        ] {
             let c = p(s);
             assert_eq!((c.title.as_str(), c.due_time), (s, None), "{s}");
         }
@@ -621,7 +684,10 @@ mod tests {
     #[test]
     fn time_without_date_is_today_if_ahead_else_tomorrow() {
         let c = p("call 5pm");
-        assert_eq!((c.title.as_str(), c.due_date, c.due_time), ("call", d(2026, 11, 13), t(17, 0)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date, c.due_time),
+            ("call", d(2026, 11, 13), t(17, 0))
+        );
         let c = p("call 9am");
         assert_eq!((c.due_date, c.due_time), (d(2026, 11, 14), t(9, 0)));
         // Exactly now is not ahead.
@@ -668,7 +734,10 @@ mod tests {
         assert_eq!(p("a").priority, Priority::None);
         assert_eq!(p("a !low !high").priority, Priority::High);
         let c = p("wow !urgent");
-        assert_eq!((c.title.as_str(), c.priority), ("wow !urgent", Priority::None));
+        assert_eq!(
+            (c.title.as_str(), c.priority),
+            ("wow !urgent", Priority::None)
+        );
         assert_eq!(p("a !high,").priority, Priority::High);
     }
 
@@ -685,11 +754,17 @@ mod tests {
     #[test]
     fn links() {
         let c = p("read https://example.com/a?b=1#frag, then HTTP://X.org");
-        assert_eq!(c.links, vec!["https://example.com/a?b=1#frag", "HTTP://X.org"]);
+        assert_eq!(
+            c.links,
+            vec!["https://example.com/a?b=1#frag", "HTTP://X.org"]
+        );
         assert!(c.tags.is_empty(), "fragment must not become a tag");
         assert_eq!(c.title, "read then");
         assert_eq!(p("(see https://a.io/x).").links, vec!["https://a.io/x"]);
-        assert_eq!(p("https://en.wikipedia.org/wiki/Foo_(bar)").links, vec!["https://en.wikipedia.org/wiki/Foo_(bar)"]);
+        assert_eq!(
+            p("https://en.wikipedia.org/wiki/Foo_(bar)").links,
+            vec!["https://en.wikipedia.org/wiki/Foo_(bar)"]
+        );
         assert_eq!(p("not a link http:// here").links, Vec::<String>::new());
     }
 
@@ -718,7 +793,10 @@ mod tests {
     #[test]
     fn only_first_date_and_first_time_are_consumed() {
         let c = p("sync mon tue");
-        assert_eq!((c.title.as_str(), c.due_date), ("sync tue", d(2026, 11, 16)));
+        assert_eq!(
+            (c.title.as_str(), c.due_date),
+            ("sync tue", d(2026, 11, 16))
+        );
         let c = p("a 5pm 6pm");
         assert_eq!((c.title.as_str(), c.due_time), ("a 6pm", t(17, 0)));
     }
@@ -747,7 +825,10 @@ mod tests {
         assert_eq!(p("buy milk").preview(), "Inbox");
         assert_eq!(p("a tomorrow").preview(), "Sat 14 Nov");
         assert_eq!(p("a #x #y !low").preview(), "Inbox · #x · #y · !low");
-        assert_eq!(p("a !med https://a.io https://b.io").preview(), "Inbox · !med · 2 links");
+        assert_eq!(
+            p("a !med https://a.io https://b.io").preview(),
+            "Inbox · !med · 2 links"
+        );
         assert_eq!(p("a 9am").preview(), "Sat 14 Nov · 09:00");
     }
 

@@ -28,7 +28,9 @@ pub fn first_of_month(d: NaiveDate) -> NaiveDate {
 pub fn grid_days(month: NaiveDate) -> Vec<NaiveDate> {
     let first = first_of_month(month);
     let start = first - Days::new(u64::from(first.weekday().num_days_from_monday()));
-    (0..GRID_DAYS as u64).map(|i| start + Days::new(i)).collect()
+    (0..GRID_DAYS as u64)
+        .map(|i| start + Days::new(i))
+        .collect()
 }
 
 /// Keyboard day movement: left/right = ±1 day, up/down = ±1 week. Saturates at the calendar's bounds.
@@ -45,7 +47,11 @@ pub fn move_day(d: NaiveDate, step: Step) -> NaiveDate {
 /// Shift by whole months, clamping the day (Jan 31 + 1 month = Feb 28/29).
 pub fn shift_months(d: NaiveDate, n: i32) -> NaiveDate {
     let m = Months::new(n.unsigned_abs());
-    let shifted = if n >= 0 { d.checked_add_months(m) } else { d.checked_sub_months(m) };
+    let shifted = if n >= 0 {
+        d.checked_add_months(m)
+    } else {
+        d.checked_sub_months(m)
+    };
     shifted.unwrap_or(d)
 }
 
@@ -55,7 +61,8 @@ pub fn month_label(d: NaiveDate) -> String {
 
 /// Local first and last calendar day an event touches (`end_ts` is exclusive).
 pub fn event_span_days<Tz: TimeZone>(e: &Event, tz: &Tz) -> Option<(NaiveDate, NaiveDate)> {
-    let local = |ts: i64| chrono::DateTime::from_timestamp(ts, 0).map(|d| d.with_timezone(tz).date_naive());
+    let local =
+        |ts: i64| chrono::DateTime::from_timestamp(ts, 0).map(|d| d.with_timezone(tz).date_naive());
     let first = local(e.start_ts)?;
     let last = local((e.end_ts - 1).max(e.start_ts))?;
     Some((first, last))
@@ -82,7 +89,9 @@ pub fn day_marks<Tz: TimeZone>(events: &[Event], open_tasks: &[Task], tz: &Tz) -
             }
         }
     }
-    marks.tasks.extend(open_tasks.iter().filter_map(|t| t.due_date));
+    marks
+        .tasks
+        .extend(open_tasks.iter().filter_map(|t| t.due_date));
     marks
 }
 
@@ -132,7 +141,10 @@ mod tests {
         assert_eq!(days[0], d("2026-10-26"));
         assert_eq!(days[6], d("2026-11-01"));
         assert_eq!(days[41], d("2026-12-06"));
-        assert!(days.iter().step_by(7).all(|x| x.weekday().num_days_from_monday() == 0));
+        assert!(days
+            .iter()
+            .step_by(7)
+            .all(|x| x.weekday().num_days_from_monday() == 0));
     }
 
     #[test]
@@ -177,7 +189,11 @@ mod tests {
     }
 
     fn at(tz: &FixedOffset, day: &str, h: u32) -> i64 {
-        d(day).and_time(NaiveTime::from_hms_opt(h, 0, 0).unwrap()).and_local_timezone(*tz).unwrap().timestamp()
+        d(day)
+            .and_time(NaiveTime::from_hms_opt(h, 0, 0).unwrap())
+            .and_local_timezone(*tz)
+            .unwrap()
+            .timestamp()
     }
 
     #[test]
@@ -185,18 +201,30 @@ mod tests {
         let tz = FixedOffset::east_opt(5 * 3600 + 1800).unwrap();
         // Ends exactly at local midnight: must not leak into the next day.
         let e = event(at(&tz, "2026-11-13", 22), at(&tz, "2026-11-14", 0));
-        assert_eq!(event_span_days(&e, &tz), Some((d("2026-11-13"), d("2026-11-13"))));
+        assert_eq!(
+            event_span_days(&e, &tz),
+            Some((d("2026-11-13"), d("2026-11-13")))
+        );
         let multi = event(at(&tz, "2026-11-13", 22), at(&tz, "2026-11-15", 1));
-        assert_eq!(event_span_days(&multi, &tz), Some((d("2026-11-13"), d("2026-11-15"))));
+        assert_eq!(
+            event_span_days(&multi, &tz),
+            Some((d("2026-11-13"), d("2026-11-15")))
+        );
         // Zero-length events still land on their day.
         let instant = event(at(&tz, "2026-11-13", 9), at(&tz, "2026-11-13", 9));
-        assert_eq!(event_span_days(&instant, &tz), Some((d("2026-11-13"), d("2026-11-13"))));
+        assert_eq!(
+            event_span_days(&instant, &tz),
+            Some((d("2026-11-13"), d("2026-11-13")))
+        );
     }
 
     #[test]
     fn marks_cover_every_spanned_day_and_task_dates() {
         let tz = Utc;
-        let multi = event(at(&FixedOffset::east_opt(0).unwrap(), "2026-11-13", 10), at(&FixedOffset::east_opt(0).unwrap(), "2026-11-15", 10));
+        let multi = event(
+            at(&FixedOffset::east_opt(0).unwrap(), "2026-11-13", 10),
+            at(&FixedOffset::east_opt(0).unwrap(), "2026-11-15", 10),
+        );
         let task = Task {
             id: 1,
             title: "t".into(),
@@ -211,9 +239,16 @@ mod tests {
             completed_at: None,
             deleted_at: None,
         };
-        let undated = Task { id: 2, due_date: None, ..task.clone() };
+        let undated = Task {
+            id: 2,
+            due_date: None,
+            ..task.clone()
+        };
         let marks = day_marks(&[multi], &[task, undated], &tz);
-        assert_eq!(marks.events, HashSet::from([d("2026-11-13"), d("2026-11-14"), d("2026-11-15")]));
+        assert_eq!(
+            marks.events,
+            HashSet::from([d("2026-11-13"), d("2026-11-14"), d("2026-11-15")])
+        );
         assert_eq!(marks.tasks, HashSet::from([d("2026-11-20")]));
     }
 

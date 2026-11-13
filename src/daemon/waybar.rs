@@ -34,7 +34,9 @@ pub fn format_minutes(minutes: i64) -> String {
 }
 
 fn escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -63,7 +65,9 @@ fn clock<Tz: TimeZone>(tz: &Tz, ts: i64) -> String
 where
     Tz::Offset: Display,
 {
-    tz.timestamp_opt(ts, 0).single().map_or_else(|| "??:??".to_owned(), |t| t.format("%H:%M").to_string())
+    tz.timestamp_opt(ts, 0)
+        .single()
+        .map_or_else(|| "??:??".to_owned(), |t| t.format("%H:%M").to_string())
 }
 
 fn event_title(e: &Event) -> &str {
@@ -95,16 +99,28 @@ where
 
     // ── text ──
     let timed = || events.iter().filter(|e| !e.all_day);
-    let in_progress = timed().filter(|e| e.start_ts <= now_ts && now_ts < e.end_ts).max_by_key(|e| e.start_ts);
+    let in_progress = timed()
+        .filter(|e| e.start_ts <= now_ts && now_ts < e.end_ts)
+        .max_by_key(|e| e.start_ts);
     let upcoming = timed()
         .filter(|e| e.start_ts > now_ts && e.start_ts <= now_ts + NEXT_EVENT_HORIZON_SECS)
         .min_by_key(|e| e.start_ts);
 
     let (text, state) = if let Some(e) = in_progress {
-        (format!("{} now", truncate(event_title(e), MAX_TEXT_TITLE_CHARS)), "now")
+        (
+            format!("{} now", truncate(event_title(e), MAX_TEXT_TITLE_CHARS)),
+            "now",
+        )
     } else if let Some(e) = upcoming {
         let minutes = (e.start_ts - now_ts + 59) / 60;
-        (format!("{} in {}", truncate(event_title(e), MAX_TEXT_TITLE_CHARS), format_minutes(minutes)), "upcoming")
+        (
+            format!(
+                "{} in {}",
+                truncate(event_title(e), MAX_TEXT_TITLE_CHARS),
+                format_minutes(minutes)
+            ),
+            "upcoming",
+        )
     } else if open_tasks == 0 {
         ("no tasks".to_owned(), "idle")
     } else if open_tasks == 1 {
@@ -115,8 +131,10 @@ where
 
     // ── tooltip ──
     let (day_start, day_end) = day_bounds(&tz, today);
-    let mut todays: Vec<&Event> =
-        events.iter().filter(|e| e.start_ts < day_end && e.end_ts > day_start).collect();
+    let mut todays: Vec<&Event> = events
+        .iter()
+        .filter(|e| e.start_ts < day_end && e.end_ts > day_start)
+        .collect();
     todays.sort_by_key(|e| (!e.all_day, e.start_ts));
 
     let mut sections: Vec<String> = vec![format!("<b>{}</b>", now.format("%A, %b %-d"))];
@@ -158,10 +176,16 @@ where
         lines
     };
     if !overdue.is_empty() {
-        sections.push(format!("<b>Overdue</b>\n{}", task_lines(overdue, true).join("\n")));
+        sections.push(format!(
+            "<b>Overdue</b>\n{}",
+            task_lines(overdue, true).join("\n")
+        ));
     }
     if !due_today.is_empty() {
-        sections.push(format!("<b>Due today</b>\n{}", task_lines(due_today, false).join("\n")));
+        sections.push(format!(
+            "<b>Due today</b>\n{}",
+            task_lines(due_today, false).join("\n")
+        ));
     }
     if todays.is_empty() && overdue.is_empty() && due_today.is_empty() {
         sections.push("Nothing scheduled today".to_owned());
@@ -192,7 +216,9 @@ pub fn collect(db: &Db, now: &DateTime<Local>) -> Result<Value> {
 
 /// Write `contents` to `path` via a temp file in the same directory + rename.
 pub fn write_atomic(path: &Path, contents: &str) -> Result<()> {
-    let dir = path.parent().context("waybar file has no parent directory")?;
+    let dir = path
+        .parent()
+        .context("waybar file has no parent directory")?;
     std::fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, contents).with_context(|| format!("writing {}", tmp.display()))?;
@@ -271,7 +297,12 @@ mod tests {
     }
 
     fn classes(v: &Value) -> Vec<&str> {
-        v["class"].as_array().unwrap().iter().map(|c| c.as_str().unwrap()).collect()
+        v["class"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c.as_str().unwrap())
+            .collect()
     }
 
     #[test]
@@ -304,18 +335,48 @@ mod tests {
 
     #[test]
     fn in_progress_event_says_now() {
-        let v = render(&at(10, 10), &[ev("Standup", at(10, 0), 30), ev("Later", at(11, 0), 30)], &[], &[], 3);
+        let v = render(
+            &at(10, 10),
+            &[ev("Standup", at(10, 0), 30), ev("Later", at(11, 0), 30)],
+            &[],
+            &[],
+            3,
+        );
         assert_eq!(text(&v), "Standup now");
         assert_eq!(classes(&v), ["now"]);
         // Boundaries: starts exactly now = now; ends exactly now = no longer in progress.
-        assert_eq!(text(&render(&at(10, 0), &[ev("Standup", at(10, 0), 30)], &[], &[], 0)), "Standup now");
-        assert_eq!(text(&render(&at(10, 30), &[ev("Standup", at(10, 0), 30)], &[], &[], 2)), "2 tasks");
+        assert_eq!(
+            text(&render(
+                &at(10, 0),
+                &[ev("Standup", at(10, 0), 30)],
+                &[],
+                &[],
+                0
+            )),
+            "Standup now"
+        );
+        assert_eq!(
+            text(&render(
+                &at(10, 30),
+                &[ev("Standup", at(10, 0), 30)],
+                &[],
+                &[],
+                2
+            )),
+            "2 tasks"
+        );
     }
 
     #[test]
     fn events_beyond_24h_and_all_day_do_not_drive_the_text() {
         let far = tz().with_ymd_and_hms(2026, 11, 14, 9, 31, 0).unwrap();
-        let v = render(&at(9, 30), &[ev("Far", far, 30), all_day("Holiday")], &[], &[], 1);
+        let v = render(
+            &at(9, 30),
+            &[ev("Far", far, 30), all_day("Holiday")],
+            &[],
+            &[],
+            1,
+        );
         assert_eq!(text(&v), "1 task");
     }
 
@@ -340,8 +401,19 @@ mod tests {
     #[test]
     fn tooltip_lists_events_then_tasks_and_escapes_pango() {
         let od = [task("Fix <b>bug</b> & ship", (11, 10), None)];
-        let today = [task("Call Tom & Jerry", (11, 13), Some((14, 30))), task("Plain", (11, 13), None)];
-        let events = [ev("R&D <sync>", at(10, 0), 30), all_day("Holiday"), ev("Tomorrow", tz().with_ymd_and_hms(2026, 11, 14, 10, 0, 0).unwrap(), 30)];
+        let today = [
+            task("Call Tom & Jerry", (11, 13), Some((14, 30))),
+            task("Plain", (11, 13), None),
+        ];
+        let events = [
+            ev("R&D <sync>", at(10, 0), 30),
+            all_day("Holiday"),
+            ev(
+                "Tomorrow",
+                tz().with_ymd_and_hms(2026, 11, 14, 10, 0, 0).unwrap(),
+                30,
+            ),
+        ];
         let v = render(&at(9, 0), &events, &od, &today, 4);
         let tip = v["tooltip"].as_str().unwrap();
         assert_eq!(
@@ -355,15 +427,32 @@ mod tests {
              • 14:30  Call Tom &amp; Jerry\n\
              • Plain"
         );
-        assert_eq!(text(&render(&at(9, 0), &[ev("R&D <x>", at(10, 0), 30)], &[], &[], 0)), "R&amp;D &lt;x&gt; in 1h");
+        assert_eq!(
+            text(&render(
+                &at(9, 0),
+                &[ev("R&D <x>", at(10, 0), 30)],
+                &[],
+                &[],
+                0
+            )),
+            "R&amp;D &lt;x&gt; in 1h"
+        );
     }
 
     #[test]
     fn empty_day_tooltip_and_task_cap() {
         let v = render(&at(9, 0), &[], &[], &[], 0);
-        assert_eq!(v["tooltip"], "<b>Friday, Nov 13</b>\n\nNothing scheduled today");
-        let many: Vec<Task> = (0..10).map(|i| task(&format!("t{i}"), (11, 1), None)).collect();
-        let tip = render(&at(9, 0), &[], &many, &[], 10)["tooltip"].as_str().unwrap().to_owned();
+        assert_eq!(
+            v["tooltip"],
+            "<b>Friday, Nov 13</b>\n\nNothing scheduled today"
+        );
+        let many: Vec<Task> = (0..10)
+            .map(|i| task(&format!("t{i}"), (11, 1), None))
+            .collect();
+        let tip = render(&at(9, 0), &[], &many, &[], 10)["tooltip"]
+            .as_str()
+            .unwrap()
+            .to_owned();
         assert!(tip.contains("• t7"));
         assert!(!tip.contains("• t8"));
         assert!(tip.ends_with("…and 2 more"));
@@ -373,7 +462,10 @@ mod tests {
     fn long_titles_are_truncated_in_text_only() {
         let long = "A".repeat(60);
         let v = render(&at(9, 0), &[ev(&long, at(9, 30), 30)], &[], &[], 0);
-        assert_eq!(text(&v).chars().count(), MAX_TEXT_TITLE_CHARS + " in 30m".len());
+        assert_eq!(
+            text(&v).chars().count(),
+            MAX_TEXT_TITLE_CHARS + " in 30m".len()
+        );
         assert!(text(&v).starts_with(&format!("{}…", "A".repeat(27))));
         assert!(v["tooltip"].as_str().unwrap().contains(&long));
     }

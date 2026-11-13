@@ -32,7 +32,10 @@ where
 
 /// Date and/or time label for a task row; `None` when there is nothing to show.
 pub fn task_when(t: &Task, show_date: bool) -> Option<String> {
-    let date = t.due_date.filter(|_| show_date).map(|d| d.format("%a %-d %b").to_string());
+    let date = t
+        .due_date
+        .filter(|_| show_date)
+        .map(|d| d.format("%a %-d %b").to_string());
     let time = t.due_time.map(|t| t.format("%H:%M").to_string());
     match (date, time) {
         (Some(d), Some(t)) => Some(format!("{d} {t}")),
@@ -61,7 +64,11 @@ pub fn priority_class(p: Priority) -> Option<&'static str> {
 
 /// First non-empty line of the notes, for the one-line preview under a task title.
 pub fn notes_preview(notes: &str) -> Option<String> {
-    notes.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string)
+    notes
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .map(str::to_string)
 }
 
 /// Heading for the events list: "Today · Fri 13 Nov", "Tomorrow · …", otherwise just the date.
@@ -120,11 +127,19 @@ mod tests {
     #[test]
     fn event_times_render_in_the_given_zone() {
         let tz = FixedOffset::east_opt(2 * 3600).unwrap();
-        let start = d("2026-11-13").and_hms_opt(9, 0, 0).unwrap().and_local_timezone(tz).unwrap().timestamp();
+        let start = d("2026-11-13")
+            .and_hms_opt(9, 0, 0)
+            .unwrap()
+            .and_local_timezone(tz)
+            .unwrap()
+            .timestamp();
         let e = ev(start, start + 3600, false);
         assert_eq!(event_when(&e, &tz, false), "09:00–10:00");
         assert_eq!(event_when(&e, &tz, true), "Fri 13 Nov 09:00–10:00");
-        assert_eq!(event_when(&ev(start, start + 86400, true), &tz, false), "All day");
+        assert_eq!(
+            event_when(&ev(start, start + 86400, true), &tz, false),
+            "All day"
+        );
     }
 
     fn task(date: Option<&str>, time: Option<(u32, u32)>) -> Task {
@@ -146,16 +161,28 @@ mod tests {
 
     #[test]
     fn task_when_combinations() {
-        assert_eq!(task_when(&task(Some("2026-11-10"), Some((9, 5))), true).as_deref(), Some("Tue 10 Nov 09:05"));
-        assert_eq!(task_when(&task(Some("2026-11-10"), Some((9, 5))), false).as_deref(), Some("09:05"));
-        assert_eq!(task_when(&task(Some("2026-11-10"), None), true).as_deref(), Some("Tue 10 Nov"));
+        assert_eq!(
+            task_when(&task(Some("2026-11-10"), Some((9, 5))), true).as_deref(),
+            Some("Tue 10 Nov 09:05")
+        );
+        assert_eq!(
+            task_when(&task(Some("2026-11-10"), Some((9, 5))), false).as_deref(),
+            Some("09:05")
+        );
+        assert_eq!(
+            task_when(&task(Some("2026-11-10"), None), true).as_deref(),
+            Some("Tue 10 Nov")
+        );
         assert_eq!(task_when(&task(Some("2026-11-10"), None), false), None);
         assert_eq!(task_when(&task(None, None), true), None);
     }
 
     #[test]
     fn notes_preview_skips_blank_lines() {
-        assert_eq!(notes_preview("\n  \n  first line \nsecond").as_deref(), Some("first line"));
+        assert_eq!(
+            notes_preview("\n  \n  first line \nsecond").as_deref(),
+            Some("first line")
+        );
         assert_eq!(notes_preview("  \n"), None);
     }
 

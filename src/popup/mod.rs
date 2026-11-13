@@ -15,9 +15,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use anyhow::{bail, Context, Result};
-use gtk4 as gtk;
 use gtk::prelude::*;
 use gtk::{gdk, glib};
+use gtk4 as gtk;
 
 use crate::app::APP_ID;
 use crate::config::Config;
@@ -53,7 +53,10 @@ pub fn run() -> Result<()> {
 
 fn activate(app: &gtk::Application, cfg: &Config) -> Result<()> {
     // Already running: toggle.
-    if let Some(window) = app.active_window().or_else(|| app.windows().into_iter().next()) {
+    if let Some(window) = app
+        .active_window()
+        .or_else(|| app.windows().into_iter().next())
+    {
         if window.is_visible() {
             window.close();
         } else {
@@ -88,15 +91,25 @@ fn load_css() -> Result<()> {
     let base = gtk::CssProvider::new();
     base.connect_parsing_error(|_, section, err| eprintln!("default stylesheet: {section}: {err}"));
     base.load_from_string(DEFAULT_CSS);
-    gtk::style_context_add_provider_for_display(&display, &base, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    gtk::style_context_add_provider_for_display(
+        &display,
+        &base,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 
     if let Ok(path) = paths::style_file() {
         if path.is_file() {
             let user = gtk::CssProvider::new();
             let shown = path.display().to_string();
-            user.connect_parsing_error(move |_, section, err| eprintln!("{shown}: {section}: {err}"));
+            user.connect_parsing_error(move |_, section, err| {
+                eprintln!("{shown}: {section}: {err}")
+            });
             user.load_from_path(&path);
-            gtk::style_context_add_provider_for_display(&display, &user, gtk::STYLE_PROVIDER_PRIORITY_USER);
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &user,
+                gtk::STYLE_PROVIDER_PRIORITY_USER,
+            );
         }
     }
     Ok(())

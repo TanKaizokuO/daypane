@@ -116,7 +116,9 @@ fn times(raw: &RawEvent) -> Option<(bool, i64, i64)> {
         };
         return Some((true, start_ts, end_ts.max(start_ts)));
     }
-    let start_ts = DateTime::parse_from_rfc3339(start.date_time.as_deref()?).ok()?.timestamp();
+    let start_ts = DateTime::parse_from_rfc3339(start.date_time.as_deref()?)
+        .ok()?
+        .timestamp();
     let end_ts = match raw.end.as_ref().and_then(|e| e.date_time.as_deref()) {
         Some(e) => DateTime::parse_from_rfc3339(e).ok()?.timestamp(),
         None => start_ts,
@@ -128,9 +130,15 @@ fn meet_link(raw: &RawEvent) -> Option<String> {
     raw.hangout_link
         .clone()
         .or_else(|| {
-            raw.conference_data.as_ref()?.entry_points.iter().find_map(|p| {
-                (p.entry_point_type.as_deref() == Some("video")).then(|| p.uri.clone()).flatten()
-            })
+            raw.conference_data
+                .as_ref()?
+                .entry_points
+                .iter()
+                .find_map(|p| {
+                    (p.entry_point_type.as_deref() == Some("video"))
+                        .then(|| p.uri.clone())
+                        .flatten()
+                })
         })
         .filter(|l| !l.is_empty())
 }
@@ -149,7 +157,11 @@ pub fn map_event(calendar_id: &str, raw: &RawEvent) -> Option<EventChange> {
     Some(EventChange::Upsert(Event {
         calendar_id: calendar_id.to_owned(),
         id: raw.id.clone(),
-        summary: raw.summary.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| NO_TITLE.to_owned()),
+        summary: raw
+            .summary
+            .clone()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| NO_TITLE.to_owned()),
         description: raw.description.clone().unwrap_or_default(),
         location: raw.location.clone().filter(|l| !l.is_empty()),
         all_day,
@@ -201,11 +213,20 @@ mod tests {
         // 2026-11-13T04:30:00Z
         assert_eq!(e.start_ts, 1_794_544_200);
         assert_eq!(e.end_ts - e.start_ts, 30 * 60);
-        assert_eq!(e.meet_link.as_deref(), Some("https://meet.google.com/aaa-bbbb-ccc"));
-        assert_eq!(e.html_link.as_deref(), Some("https://calendar.google.com/event?eid=abc"));
+        assert_eq!(
+            e.meet_link.as_deref(),
+            Some("https://meet.google.com/aaa-bbbb-ccc")
+        );
+        assert_eq!(
+            e.html_link.as_deref(),
+            Some("https://calendar.google.com/event?eid=abc")
+        );
         assert_eq!(e.location.as_deref(), Some("Room 4"));
         assert!(!e.use_default_reminders);
-        assert_eq!(e.reminders, vec![Reminder { minutes: 10 }, Reminder { minutes: 1 }]);
+        assert_eq!(
+            e.reminders,
+            vec![Reminder { minutes: 10 }, Reminder { minutes: 1 }]
+        );
     }
 
     #[test]
@@ -228,8 +249,14 @@ mod tests {
 
     #[test]
     fn all_day_without_end_spans_one_day() {
-        let e = upsert(map_event("cal", &raw(json!({"id": "e", "start": {"date": "2026-11-13"}}))));
-        assert_eq!(e.end_ts, local_day_bounds(NaiveDate::from_ymd_opt(2026, 11, 14).unwrap()).0);
+        let e = upsert(map_event(
+            "cal",
+            &raw(json!({"id": "e", "start": {"date": "2026-11-13"}})),
+        ));
+        assert_eq!(
+            e.end_ts,
+            local_day_bounds(NaiveDate::from_ymd_opt(2026, 11, 14).unwrap()).0
+        );
     }
 
     #[test]
@@ -274,8 +301,17 @@ mod tests {
 
     #[test]
     fn unrepresentable_event_is_skipped() {
-        assert_eq!(map_event("cal", &raw(json!({"id": "x", "summary": "no times"}))), None);
-        assert_eq!(map_event("cal", &raw(json!({"id": "x", "start": {"dateTime": "garbage"}}))), None);
+        assert_eq!(
+            map_event("cal", &raw(json!({"id": "x", "summary": "no times"}))),
+            None
+        );
+        assert_eq!(
+            map_event(
+                "cal",
+                &raw(json!({"id": "x", "start": {"dateTime": "garbage"}}))
+            ),
+            None
+        );
     }
 
     #[test]
@@ -291,7 +327,8 @@ mod tests {
         assert_eq!(c.color.as_deref(), Some("#9fe1e7"));
         assert_eq!(c.default_reminders, vec![Reminder { minutes: 30 }]);
 
-        let deleted: RawCalendarEntry = serde_json::from_value(json!({"id": "d", "deleted": true})).unwrap();
+        let deleted: RawCalendarEntry =
+            serde_json::from_value(json!({"id": "d", "deleted": true})).unwrap();
         assert!(map_calendar(&deleted).is_none());
 
         let bare: RawCalendarEntry = serde_json::from_value(json!({"id": "only-id"})).unwrap();

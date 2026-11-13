@@ -57,10 +57,16 @@ pub fn load_refresh_token() -> Result<Option<String>> {
     run(|| async {
         let keyring = Keyring::new().await.map_err(unavailable)?;
         keyring.unlock().await.map_err(unavailable)?;
-        let items = keyring.search_items(&attributes()).await.map_err(unavailable)?;
-        let Some(item) = items.first() else { return Ok(None) };
+        let items = keyring
+            .search_items(&attributes())
+            .await
+            .map_err(unavailable)?;
+        let Some(item) = items.first() else {
+            return Ok(None);
+        };
         let secret = item.secret().await.map_err(unavailable)?;
-        let token = std::str::from_utf8(secret.as_bytes()).context("stored refresh token is not UTF-8")?;
+        let token =
+            std::str::from_utf8(secret.as_bytes()).context("stored refresh token is not UTF-8")?;
         Ok(Some(token.trim().to_owned()).filter(|t| !t.is_empty()))
     })
 }
@@ -71,12 +77,21 @@ mod tests {
 
     #[test]
     fn run_is_safe_inside_a_tokio_runtime() {
-        let outer = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let v = outer.block_on(async { run(|| async { Ok(41 + 1) }) }).unwrap();
+        let outer = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let v = outer
+            .block_on(async { run(|| async { Ok(41 + 1) }) })
+            .unwrap();
         assert_eq!(v, 42);
         // …and from a spawn_blocking thread.
         let v = outer
-            .block_on(async { tokio::task::spawn_blocking(|| run(|| async { Ok("ok") })).await.unwrap() })
+            .block_on(async {
+                tokio::task::spawn_blocking(|| run(|| async { Ok("ok") }))
+                    .await
+                    .unwrap()
+            })
             .unwrap();
         assert_eq!(v, "ok");
     }

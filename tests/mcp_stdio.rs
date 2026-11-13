@@ -14,7 +14,11 @@ fn bin() -> PathBuf {
     let mut p = std::env::current_exe().unwrap();
     p.pop(); // deps/
     p.pop(); // debug/ or release/
-    p.push(format!("{}{}", env!("CARGO_PKG_NAME"), std::env::consts::EXE_SUFFIX));
+    p.push(format!(
+        "{}{}",
+        env!("CARGO_PKG_NAME"),
+        std::env::consts::EXE_SUFFIX
+    ));
     assert!(p.exists(), "binary not built at {}", p.display());
     p
 }
@@ -48,7 +52,12 @@ impl Client {
                 }
             }
         });
-        Self { child, stdin, lines, next_id: 0 }
+        Self {
+            child,
+            stdin,
+            lines,
+            next_id: 0,
+        }
     }
 
     fn send(&mut self, msg: &Value) {
@@ -67,7 +76,8 @@ impl Client {
                 .lines
                 .recv_timeout(Duration::from_secs(20))
                 .unwrap_or_else(|e| panic!("no response to {method}: {e}"));
-            let v: Value = serde_json::from_str(&line).unwrap_or_else(|e| panic!("non-JSON on stdout {line:?}: {e}"));
+            let v: Value = serde_json::from_str(&line)
+                .unwrap_or_else(|e| panic!("non-JSON on stdout {line:?}: {e}"));
             if v.get("id") == Some(&json!(id)) {
                 assert!(v.get("error").is_none(), "{method} failed: {v}");
                 return v["result"].clone();
@@ -79,10 +89,15 @@ impl Client {
     fn call(&mut self, name: &str, args: Value) -> (bool, Value) {
         let r = self.request("tools/call", json!({"name": name, "arguments": args}));
         let is_error = r["isError"].as_bool().unwrap_or(false);
-        let text = r["content"][0]["text"].as_str().unwrap_or_else(|| panic!("no text content: {r}"));
+        let text = r["content"][0]["text"]
+            .as_str()
+            .unwrap_or_else(|| panic!("no text content: {r}"));
         let value = serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()));
         if !is_error {
-            assert_eq!(r["structuredContent"], value, "structured content mirrors text");
+            assert_eq!(
+                r["structuredContent"], value,
+                "structured content mirrors text"
+            );
         }
         (is_error, value)
     }
@@ -121,7 +136,12 @@ fn full_task_lifecycle_over_stdio() {
     c.send(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
 
     let tools = c.request("tools/list", json!({}));
-    let mut names: Vec<&str> = tools["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
+    let mut names: Vec<&str> = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
     names.sort_unstable();
     assert_eq!(
         names,
@@ -151,7 +171,10 @@ fn full_task_lifecycle_over_stdio() {
 
     // an absent due_date leaves it alone; explicit null clears it (and the time)
     let u = c.ok("update_task", json!({"id": id, "notes": "landlord"}));
-    assert_eq!((u["due_date"].as_str(), u["notes"].as_str()), (Some("2030-01-15"), Some("landlord")));
+    assert_eq!(
+        (u["due_date"].as_str(), u["notes"].as_str()),
+        (Some("2030-01-15"), Some("landlord"))
+    );
     let u = c.ok("update_task", json!({"id": id, "due_date": null}));
     assert!(u["due_date"].is_null() && u["due_time"].is_null(), "{u}");
     assert_eq!(u["title"], "pay rent");
@@ -168,11 +191,17 @@ fn full_task_lifecycle_over_stdio() {
     let r = c.ok("restore_task", json!({"id": id}));
     assert!(r["deleted_at"].is_null());
     assert_eq!(c.ok("list_tasks", json!({"status": "deleted"}))["count"], 0);
-    assert_eq!(c.ok("list_tasks", json!({"query": "RENT"}))["tasks"][0]["id"], id);
+    assert_eq!(
+        c.ok("list_tasks", json!({"query": "RENT"}))["tasks"][0]["id"],
+        id
+    );
 
     // complete / reopen / get
     assert!(c.ok("complete_task", json!({"id": id}))["completed_at"].is_string());
-    assert_eq!(c.ok("list_tasks", json!({"status": "completed"}))["count"], 1);
+    assert_eq!(
+        c.ok("list_tasks", json!({"status": "completed"}))["count"],
+        1
+    );
     assert!(c.ok("reopen_task", json!({"id": id}))["completed_at"].is_null());
     assert_eq!(c.ok("get_task", json!({"id": id}))["id"], id);
 
@@ -180,7 +209,10 @@ fn full_task_lifecycle_over_stdio() {
     let (is_error, msg) = c.call("get_task", json!({"id": 9999}));
     assert!(is_error && msg.as_str().unwrap().contains("9999"), "{msg}");
     let (is_error, msg) = c.call("create_task", json!({"title": "x", "due_date": "soon"}));
-    assert!(is_error && msg.as_str().unwrap().contains("YYYY-MM-DD"), "{msg}");
+    assert!(
+        is_error && msg.as_str().unwrap().contains("YYYY-MM-DD"),
+        "{msg}"
+    );
     let (is_error, _) = c.call("create_task", json!({"title": "x", "due_time": "09:00"}));
     assert!(is_error);
     assert_eq!(c.ok("get_task", json!({"id": id}))["id"], id);

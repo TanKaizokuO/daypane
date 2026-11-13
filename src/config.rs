@@ -25,7 +25,12 @@ pub struct PopupConfig {
 
 impl Default for PopupConfig {
     fn default() -> Self {
-        Self { margin_top: 8, margin_right: 8, width: 760, height: 480 }
+        Self {
+            margin_top: 8,
+            margin_right: 8,
+            width: 760,
+            height: 480,
+        }
     }
 }
 
@@ -40,7 +45,10 @@ pub struct ReminderConfig {
 
 impl Default for ReminderConfig {
     fn default() -> Self {
-        Self { task_offset_minutes: 10, snooze_minutes: 10 }
+        Self {
+            task_offset_minutes: 10,
+            snooze_minutes: 10,
+        }
     }
 }
 
@@ -57,7 +65,11 @@ pub struct GoogleConfig {
 
 impl Default for GoogleConfig {
     fn default() -> Self {
-        Self { client_id: None, client_secret: None, sync_interval_seconds: 300 }
+        Self {
+            client_id: None,
+            client_secret: None,
+            sync_interval_seconds: 300,
+        }
     }
 }
 

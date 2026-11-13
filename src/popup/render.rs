@@ -4,9 +4,9 @@ use std::rc::Rc;
 
 use anyhow::Result;
 use chrono::{Datelike, Local, NaiveDate};
-use gtk4 as gtk;
 use gtk::prelude::*;
 use gtk::{glib, graphene};
+use gtk4 as gtk;
 
 use super::format;
 use super::layout;
@@ -20,7 +20,11 @@ fn clear(container: &gtk::Box) {
 }
 
 fn text_label(text: &str, classes: &[&str]) -> gtk::Label {
-    gtk::Label::builder().label(text).xalign(0.0).css_classes(classes.to_vec()).build()
+    gtk::Label::builder()
+        .label(text)
+        .xalign(0.0)
+        .css_classes(classes.to_vec())
+        .build()
 }
 
 fn empty_label(text: &str) -> gtk::Label {
@@ -31,7 +35,10 @@ impl Ui {
     /// Re-render both panes from the database, keeping the selection.
     pub fn refresh(self: &Rc<Self>) {
         self.state.borrow_mut().today = Local::now().date_naive();
-        let result = self.render_calendar().and_then(|()| self.render_events()).and_then(|()| self.render_tasks());
+        let result = self
+            .render_calendar()
+            .and_then(|()| self.render_events())
+            .and_then(|()| self.render_tasks());
         if let Err(e) = result {
             self.set_status(&format!("Database error: {e:#}"), true);
         }
@@ -55,7 +62,10 @@ impl Ui {
         let from = db::local_day_bounds(days[0]).0;
         let to = db::local_day_bounds(days[days.len() - 1]).1;
         let events = self.db.events_between(from, to)?;
-        let tasks = self.db.list_tasks(&TaskFilter { status: Status::Open, ..Default::default() })?;
+        let tasks = self.db.list_tasks(&TaskFilter {
+            status: Status::Open,
+            ..Default::default()
+        })?;
         let marks = layout::day_marks(&events, &tasks, &Local);
 
         for (cell, day) in self.w.cells.iter().zip(&days) {
@@ -82,7 +92,9 @@ impl Ui {
                 (Vec::new(), true, "Type to search events")
             }
             Some(q) => {
-                self.w.events_title.set_text(&format!("Events matching “{}”", q.trim()));
+                self.w
+                    .events_title
+                    .set_text(&format!("Events matching “{}”", q.trim()));
                 (self.db.search_events(q)?, true, "No matching events")
             }
             None => {
@@ -101,10 +113,26 @@ impl Ui {
     }
 
     fn event_row(&self, e: &Event, with_date: bool) -> gtk::Box {
-        let row = gtk::Box::builder().orientation(gtk::Orientation::Vertical).css_classes(["event"]).build();
-        let head = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).build();
-        head.append(&text_label(&format::event_when(e, &Local, with_date), &["event-time"]));
-        let summary = text_label(if e.summary.is_empty() { "(no title)" } else { &e.summary }, &["event-summary"]);
+        let row = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .css_classes(["event"])
+            .build();
+        let head = gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .spacing(8)
+            .build();
+        head.append(&text_label(
+            &format::event_when(e, &Local, with_date),
+            &["event-time"],
+        ));
+        let summary = text_label(
+            if e.summary.is_empty() {
+                "(no title)"
+            } else {
+                &e.summary
+            },
+            &["event-summary"],
+        );
         summary.set_hexpand(true);
         summary.set_wrap(true);
         summary.set_wrap_mode(gtk::pango::WrapMode::WordChar);
@@ -129,8 +157,17 @@ impl Ui {
     pub fn render_tasks(self: &Rc<Self>) -> Result<()> {
         let (today, selected, search, inbox_open, prev_sel, prev_index) = {
             let s = self.state.borrow();
-            let idx = s.task_sel.and_then(|id| s.nav.iter().position(|&i| i == id));
-            (s.today, s.selected, s.search.clone(), s.inbox_open, s.task_sel, idx)
+            let idx = s
+                .task_sel
+                .and_then(|id| s.nav.iter().position(|&i| i == id));
+            (
+                s.today,
+                s.selected,
+                s.search.clone(),
+                s.inbox_open,
+                s.task_sel,
+                idx,
+            )
         };
         let scroll_value = self.w.task_scroll.vadjustment().value();
         clear(&self.w.task_box);
@@ -182,7 +219,10 @@ impl Ui {
                 }
                 self.add_rows(list, &view.due_today, today, false, &mut nav);
 
-                let inbox_box = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(2).build();
+                let inbox_box = gtk::Box::builder()
+                    .orientation(gtk::Orientation::Vertical)
+                    .spacing(2)
+                    .build();
                 let expander = gtk::Expander::builder()
                     .label(format!("Inbox ({})", view.inbox.len()))
                     .expanded(inbox_open)
@@ -199,7 +239,9 @@ impl Ui {
                     // Collapsed rows are not keyboard-reachable, but still get built so expanding is instant.
                     let mut hidden = Vec::new();
                     self.add_rows(&inbox_box, &view.inbox, today, false, &mut hidden);
-                    self.rows.borrow_mut().retain(|(id, _)| !hidden.contains(id));
+                    self.rows
+                        .borrow_mut()
+                        .retain(|(id, _)| !hidden.contains(id));
                 }
                 let ui = Rc::downgrade(self);
                 expander.connect_expanded_notify(move |e| {
@@ -227,7 +269,14 @@ impl Ui {
         Ok(())
     }
 
-    fn add_rows(self: &Rc<Self>, container: &gtk::Box, tasks: &[Task], today: NaiveDate, show_date: bool, nav: &mut Vec<i64>) {
+    fn add_rows(
+        self: &Rc<Self>,
+        container: &gtk::Box,
+        tasks: &[Task],
+        today: NaiveDate,
+        show_date: bool,
+        nav: &mut Vec<i64>,
+    ) {
         for t in tasks {
             let row = self.task_row(t, today, show_date);
             container.append(&row);
@@ -269,8 +318,14 @@ impl Ui {
         });
         row.append(&check);
 
-        let body = gtk::Box::builder().orientation(gtk::Orientation::Vertical).hexpand(true).build();
-        let head = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).build();
+        let body = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .hexpand(true)
+            .build();
+        let head = gtk::Box::builder()
+            .orientation(gtk::Orientation::Horizontal)
+            .spacing(8)
+            .build();
         let title = text_label(&t.title, &["task-title"]);
         title.set_hexpand(true);
         title.set_wrap(true);
@@ -279,13 +334,19 @@ impl Ui {
         if let Some(when) = format::task_when(t, show_date) {
             head.append(&text_label(&when, &["task-time"]));
         }
-        if let (Some(label), Some(class)) = (format::priority_label(t.priority), format::priority_class(t.priority)) {
+        if let (Some(label), Some(class)) = (
+            format::priority_label(t.priority),
+            format::priority_class(t.priority),
+        ) {
             head.append(&text_label(label, &["task-priority", class]));
         }
         body.append(&head);
 
         if !t.tags.is_empty() {
-            let tags = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).build();
+            let tags = gtk::Box::builder()
+                .orientation(gtk::Orientation::Horizontal)
+                .spacing(6)
+                .build();
             for tag in &t.tags {
                 tags.append(&text_label(&format!("#{tag}"), &["task-tag"]));
             }
@@ -330,13 +391,18 @@ impl Ui {
         };
         let Some(sel) = sel else { return };
         let rows = self.rows.borrow();
-        let Some((_, widget)) = rows.iter().find(|(id, _)| *id == sel) else { return };
+        let Some((_, widget)) = rows.iter().find(|(id, _)| *id == sel) else {
+            return;
+        };
         let adj = self.w.task_scroll.vadjustment();
         if Some(sel) == first {
             adj.set_value(adj.lower());
             return;
         }
-        let Some(p) = widget.compute_point(&self.w.task_box, &graphene::Point::new(0.0, 0.0)) else { return };
+        let Some(p) = widget.compute_point(&self.w.task_box, &graphene::Point::new(0.0, 0.0))
+        else {
+            return;
+        };
         let top = f64::from(p.y());
         let bottom = top + f64::from(widget.height());
         if top < adj.value() {

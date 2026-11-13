@@ -70,14 +70,22 @@ where
         } else {
             &[]
         };
-        let own: &[Reminder] = if e.use_default_reminders { &[] } else { &e.reminders };
+        let own: &[Reminder] = if e.use_default_reminders {
+            &[]
+        } else {
+            &e.reminders
+        };
         for r in defaults.iter().chain(own) {
             if r.minutes < 0 {
                 continue;
             }
             push(DueReminder {
                 key: format!("ev:{}:{}:{}:{}", e.calendar_id, e.id, e.start_ts, r.minutes),
-                title: if e.summary.trim().is_empty() { "(no title)".to_owned() } else { e.summary.clone() },
+                title: if e.summary.trim().is_empty() {
+                    "(no title)".to_owned()
+                } else {
+                    e.summary.clone()
+                },
                 body: event_body(e, r.minutes, tz),
                 fire_ts: e.start_ts - r.minutes * 60,
             });
@@ -85,11 +93,15 @@ where
     }
 
     for t in tasks {
-        let (Some(date), Some(time)) = (t.due_date, t.due_time) else { continue };
+        let (Some(date), Some(time)) = (t.due_date, t.due_time) else {
+            continue;
+        };
         if !t.is_open() {
             continue;
         }
-        let Some(due) = tz.from_local_datetime(&date.and_time(time)).earliest() else { continue };
+        let Some(due) = tz.from_local_datetime(&date.and_time(time)).earliest() else {
+            continue;
+        };
         let due_ts = due.timestamp();
         push(DueReminder {
             key: format!("task:{}:{}", t.id, due_ts),
@@ -113,8 +125,16 @@ where
         (Some(s), false) => s.format("%H:%M").to_string(),
         (None, _) => String::new(),
     };
-    let lead = if minutes == 0 { "starting now".to_owned() } else { format!("in {}", format_minutes(minutes)) };
-    let mut body = if when.is_empty() { lead } else { format!("{when} · {lead}") };
+    let lead = if minutes == 0 {
+        "starting now".to_owned()
+    } else {
+        format!("in {}", format_minutes(minutes))
+    };
+    let mut body = if when.is_empty() {
+        lead
+    } else {
+        format!("{when} · {lead}")
+    };
     if let Some(loc) = e.location.as_deref().filter(|l| !l.trim().is_empty()) {
         body.push_str(&format!("\n{loc}"));
     }
@@ -133,7 +153,10 @@ mod tests {
     }
 
     fn midnight_ts(tz: &FixedOffset, d: NaiveDate) -> i64 {
-        tz.from_local_datetime(&d.and_hms_opt(0, 0, 0).unwrap()).earliest().unwrap().timestamp()
+        tz.from_local_datetime(&d.and_hms_opt(0, 0, 0).unwrap())
+            .earliest()
+            .unwrap()
+            .timestamp()
     }
 
     fn date(d: u32) -> NaiveDate {
@@ -141,7 +164,9 @@ mod tests {
     }
 
     fn ts(d: u32, h: u32, m: u32) -> i64 {
-        tz().from_local_datetime(&date(d).and_hms_opt(h, m, 0).unwrap()).unwrap().timestamp()
+        tz().from_local_datetime(&date(d).and_hms_opt(h, m, 0).unwrap())
+            .unwrap()
+            .timestamp()
     }
 
     fn event(id: &str, start: i64, use_default: bool, reminders: &[i64]) -> Event {
@@ -157,7 +182,10 @@ mod tests {
             meet_link: None,
             html_link: None,
             use_default_reminders: use_default,
-            reminders: reminders.iter().map(|&minutes| Reminder { minutes }).collect(),
+            reminders: reminders
+                .iter()
+                .map(|&minutes| Reminder { minutes })
+                .collect(),
         }
     }
 
@@ -168,7 +196,10 @@ mod tests {
             color: None,
             selected: true,
             sync_token: None,
-            default_reminders: defaults.iter().map(|&minutes| Reminder { minutes }).collect(),
+            default_reminders: defaults
+                .iter()
+                .map(|&minutes| Reminder { minutes })
+                .collect(),
         }
     }
 
@@ -177,7 +208,9 @@ mod tests {
             id,
             title: format!("task {id}"),
             due_date: due.map(|(d, _)| date(d)),
-            due_time: due.and_then(|(_, t)| t).map(|(h, m)| NaiveTime::from_hms_opt(h, m, 0).unwrap()),
+            due_time: due
+                .and_then(|(_, t)| t)
+                .map(|(h, m)| NaiveTime::from_hms_opt(h, m, 0).unwrap()),
             notes: String::new(),
             priority: Priority::None,
             tags: vec![],
@@ -225,13 +258,24 @@ mod tests {
         let cal = calendar(&[30]);
         let defaulted = event("d", ts(13, 10, 0), true, &[10]);
         let overridden = event("o", ts(13, 10, 0), false, &[10]);
-        let got = run(std::slice::from_ref(&defaulted), std::slice::from_ref(&cal), &[], ts(13, 9, 30));
+        let got = run(
+            std::slice::from_ref(&defaulted),
+            std::slice::from_ref(&cal),
+            &[],
+            ts(13, 9, 30),
+        );
         assert_eq!(got.len(), 1);
         assert!(got[0].key.ends_with(":30"));
         // Its own 10-minute override is ignored while defaults are in use.
         assert!(run(&[defaulted], std::slice::from_ref(&cal), &[], ts(13, 9, 50)).is_empty());
         // Override: own 10 min fires, the calendar's 30 does not.
-        assert!(run(std::slice::from_ref(&overridden), std::slice::from_ref(&cal), &[], ts(13, 9, 30)).is_empty());
+        assert!(run(
+            std::slice::from_ref(&overridden),
+            std::slice::from_ref(&cal),
+            &[],
+            ts(13, 9, 30)
+        )
+        .is_empty());
         let got = run(&[overridden], &[cal], &[], ts(13, 9, 50));
         assert_eq!(got.len(), 1);
         assert!(got[0].key.ends_with(":10"));
@@ -287,7 +331,13 @@ mod tests {
         let mut done = task(3, Some((13, Some((14, 30)))));
         done.completed_at = Some(Utc::now());
         for now in [ts(13, 0, 0), ts(13, 9, 0), ts(13, 14, 20), ts(13, 23, 59)] {
-            assert!(run(&[], &[], &[date_only.clone(), undated.clone(), done.clone()], now).is_empty());
+            assert!(run(
+                &[],
+                &[],
+                &[date_only.clone(), undated.clone(), done.clone()],
+                now
+            )
+            .is_empty());
         }
     }
 

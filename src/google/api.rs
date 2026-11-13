@@ -24,7 +24,10 @@ pub struct GoogleBackend {
 
 impl GoogleBackend {
     pub fn new(access_token: String) -> Self {
-        Self { agent: http_agent(), access_token }
+        Self {
+            agent: http_agent(),
+            access_token,
+        }
     }
 
     fn get_json<T: DeserializeOwned>(&self, url: &Url) -> Result<Fetched<T>> {
@@ -35,13 +38,19 @@ impl GoogleBackend {
             .call()
             .with_context(|| format!("requesting {}", url.path()))?;
         match resp.status().as_u16() {
-            200..=299 => Ok(Fetched::Body(
-                resp.body_mut().read_json().with_context(|| format!("decoding response of {}", url.path()))?,
-            )),
+            200..=299 => {
+                Ok(Fetched::Body(resp.body_mut().read_json().with_context(
+                    || format!("decoding response of {}", url.path()),
+                )?))
+            }
             410 => Ok(Fetched::Gone),
             status => {
                 let body = resp.body_mut().read_to_string().unwrap_or_default();
-                bail!("Google Calendar API {} returned HTTP {status}: {}", url.path(), truncate(&body, 300))
+                bail!(
+                    "Google Calendar API {} returned HTTP {status}: {}",
+                    url.path(),
+                    truncate(&body, 300)
+                )
             }
         }
     }
@@ -88,7 +97,9 @@ struct EventsPage {
 
 fn base_url(segments: &[&str]) -> Url {
     let mut url = Url::parse(API_BASE).expect("constant URL");
-    url.path_segments_mut().expect("https URL has a path").extend(segments);
+    url.path_segments_mut()
+        .expect("https URL has a path")
+        .extend(segments);
     url
 }
 
@@ -108,7 +119,12 @@ fn calendar_list_url(page_token: Option<&str>) -> Url {
 
 /// Events list URL. Google forbids `timeMin` together with `syncToken`, so the lookback bound
 /// applies to full syncs only; incremental syncs ask for deletions explicitly.
-fn events_url(calendar_id: &str, sync_token: Option<&str>, page_token: Option<&str>, now: DateTime<Utc>) -> Url {
+fn events_url(
+    calendar_id: &str,
+    sync_token: Option<&str>,
+    page_token: Option<&str>,
+    now: DateTime<Utc>,
+) -> Url {
     let mut url = base_url(&["calendars", calendar_id, "events"]);
     {
         let mut q = url.query_pairs_mut();
@@ -160,10 +176,19 @@ impl CalendarBackend for GoogleBackend {
             let Fetched::Body(page) = self.get_json::<EventsPage>(&url)? else {
                 return Ok(SyncOutcome::Gone);
             };
-            on_page(page.items.iter().filter_map(|e| map_event(calendar_id, e)).collect())?;
+            on_page(
+                page.items
+                    .iter()
+                    .filter_map(|e| map_event(calendar_id, e))
+                    .collect(),
+            )?;
             match page.next_page_token {
                 Some(t) => page_token = Some(t),
-                None => return Ok(SyncOutcome::Complete { next_sync_token: page.next_sync_token }),
+                None => {
+                    return Ok(SyncOutcome::Complete {
+                        next_sync_token: page.next_sync_token,
+                    })
+                }
             }
         }
     }
@@ -179,7 +204,9 @@ mod tests {
     }
 
     fn query(url: &Url) -> Vec<(String, String)> {
-        url.query_pairs().map(|(k, v)| (k.into_owned(), v.into_owned())).collect()
+        url.query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect()
     }
 
     fn has(q: &[(String, String)], k: &str, v: &str) -> bool {
@@ -188,8 +215,16 @@ mod tests {
 
     #[test]
     fn calendar_ids_are_path_encoded() {
-        let url = events_url("en.indian#holiday@group.v.calendar.google.com", None, None, now());
-        assert_eq!(url.path(), "/calendar/v3/calendars/en.indian%23holiday@group.v.calendar.google.com/events");
+        let url = events_url(
+            "en.indian#holiday@group.v.calendar.google.com",
+            None,
+            None,
+            now(),
+        );
+        assert_eq!(
+            url.path(),
+            "/calendar/v3/calendars/en.indian%23holiday@group.v.calendar.google.com/events"
+        );
         let url = events_url("a/b?c", None, None, now());
         assert_eq!(url.path(), "/calendar/v3/calendars/a%2Fb%3Fc/events");
         assert_eq!(url.host_str(), Some("www.googleapis.com"));
@@ -200,7 +235,9 @@ mod tests {
         let q = query(&events_url("c", None, None, now()));
         assert!(has(&q, "singleEvents", "true"));
         assert!(has(&q, "timeMin", "2026-10-14T12:00:00Z"));
-        assert!(!q.iter().any(|(k, _)| k == "syncToken" || k == "showDeleted"));
+        assert!(!q
+            .iter()
+            .any(|(k, _)| k == "syncToken" || k == "showDeleted"));
     }
 
     #[test]
@@ -218,7 +255,9 @@ mod tests {
         let url = calendar_list_url(Some("next"));
         assert_eq!(url.path(), "/calendar/v3/users/me/calendarList");
         assert!(has(&query(&url), "pageToken", "next"));
-        assert!(!query(&calendar_list_url(None)).iter().any(|(k, _)| k == "pageToken"));
+        assert!(!query(&calendar_list_url(None))
+            .iter()
+            .any(|(k, _)| k == "pageToken"));
     }
 
     #[test]
@@ -237,7 +276,11 @@ mod tests {
         .unwrap();
         assert!(page.next_page_token.is_none());
         assert_eq!(page.next_sync_token.as_deref(), Some("SYNC1"));
-        let changes: Vec<_> = page.items.iter().filter_map(|e| map_event("cal", e)).collect();
+        let changes: Vec<_> = page
+            .items
+            .iter()
+            .filter_map(|e| map_event("cal", e))
+            .collect();
         assert_eq!(changes.len(), 2);
         assert!(matches!(&changes[0], EventChange::Upsert(e) if e.id == "a"));
         assert_eq!(changes[1], EventChange::Delete("b".into()));

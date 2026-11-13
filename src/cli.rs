@@ -108,7 +108,10 @@ pub fn calendars(args: CalendarsArgs) -> Result<()> {
 pub fn add(text: &str) -> Result<()> {
     let capture = crate::capture::parse(text, Local::now().naive_local());
     if capture.title.trim().is_empty() {
-        bail!("nothing to add: the title is empty after parsing ({})", capture.preview());
+        bail!(
+            "nothing to add: the title is empty after parsing ({})",
+            capture.preview()
+        );
     }
     let db = Db::open_default()?;
     let task = db.create_task(capture.into_new_task())?;
@@ -122,11 +125,23 @@ pub fn today(flag: JsonFlag) -> Result<()> {
     let events = db.events_on(day)?;
     let view = db.today_view(day)?;
     if flag.json {
-        return emit_json(&TodayOut { date: day, events, view });
+        return emit_json(&TodayOut {
+            date: day,
+            events,
+            view,
+        });
     }
     let lines: Vec<String> = events
         .iter()
-        .map(|e| event_line(&e.summary, e.all_day, local_naive(e.start_ts), local_naive(e.end_ts), day))
+        .map(|e| {
+            event_line(
+                &e.summary,
+                e.all_day,
+                local_naive(e.start_ts),
+                local_naive(e.end_ts),
+                day,
+            )
+        })
         .collect();
     emit(&render_today(day, &lines, &view))
 }
@@ -139,14 +154,23 @@ pub fn next(flag: JsonFlag) -> Result<()> {
     let tasks = db.timed_tasks_from(now.date())?;
     let next_event = earliest(
         now,
-        events.iter().filter(|e| !e.all_day).map(|e| (local_naive(e.start_ts), e)),
+        events
+            .iter()
+            .filter(|e| !e.all_day)
+            .map(|e| (local_naive(e.start_ts), e)),
     );
     let next_task = earliest(
         now,
-        tasks.iter().filter_map(|t| Some((t.due_date?.and_time(t.due_time?), t))),
+        tasks
+            .iter()
+            .filter_map(|t| Some((t.due_date?.and_time(t.due_time?), t))),
     );
     let Some(choice) = pick_next(next_event, next_task) else {
-        return if flag.json { emit("null\n") } else { emit("Nothing upcoming.\n") };
+        return if flag.json {
+            emit("null\n")
+        } else {
+            emit("Nothing upcoming.\n")
+        };
     };
     let (at, in_seconds) = match &choice {
         Next::Event(at, _) | Next::Task(at, _) => (*at, (*at - now).num_seconds()),
@@ -164,7 +188,11 @@ pub fn next(flag: JsonFlag) -> Result<()> {
         }));
     }
     let line = match &choice {
-        Next::Event(_, e) => format!("{}  {}  (event)", e.summary, fmt_due(at.date(), Some(at.time()), now.date())),
+        Next::Event(_, e) => format!(
+            "{}  {}  (event)",
+            e.summary,
+            fmt_due(at.date(), Some(at.time()), now.date())
+        ),
         Next::Task(_, t) => task_line(t, now.date()),
     };
     emit(&format!("{}  {line}\n", countdown(in_seconds)))
@@ -197,7 +225,12 @@ pub fn ls(args: LsArgs) -> Result<()> {
         return emit("No tasks.\n");
     }
     let today = now.date();
-    emit(&tasks.iter().map(|t| task_line(t, today) + "\n").collect::<String>())
+    emit(
+        &tasks
+            .iter()
+            .map(|t| task_line(t, today) + "\n")
+            .collect::<String>(),
+    )
 }
 
 // ─── Output plumbing ────────────────────────────────────────────────────────
@@ -274,17 +307,33 @@ fn task_line(t: &Task, today: NaiveDate) -> String {
         Priority::High => parts.push("!high".into()),
     }
     if !t.tags.is_empty() {
-        parts.push(t.tags.iter().map(|g| format!("#{g}")).collect::<Vec<_>>().join(" "));
+        parts.push(
+            t.tags
+                .iter()
+                .map(|g| format!("#{g}"))
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
     }
     parts.join("  ")
 }
 
 /// `all day  Summary` or `09:00–10:00  Summary`; `…` marks a span continuing beyond `day`.
-fn event_line(summary: &str, all_day: bool, start: NaiveDateTime, end: NaiveDateTime, day: NaiveDate) -> String {
+fn event_line(
+    summary: &str,
+    all_day: bool,
+    start: NaiveDateTime,
+    end: NaiveDateTime,
+    day: NaiveDate,
+) -> String {
     if all_day {
         return format!("all day  {summary}");
     }
-    let from = if start.date() < day { "…".to_string() } else { start.format("%H:%M").to_string() };
+    let from = if start.date() < day {
+        "…".to_string()
+    } else {
+        start.format("%H:%M").to_string()
+    };
     let to = if end.date() > day && end.time() != NaiveTime::MIN {
         "…".to_string()
     } else {
@@ -303,7 +352,11 @@ fn render_today(day: NaiveDate, event_lines: &[String], view: &TodayView) -> Str
             out.push_str(&format!("  {l}\n"));
         }
     }
-    for (heading, tasks) in [("Overdue", &view.overdue), ("Due today", &view.due_today), ("Inbox", &view.inbox)] {
+    for (heading, tasks) in [
+        ("Overdue", &view.overdue),
+        ("Due today", &view.due_today),
+        ("Inbox", &view.inbox),
+    ] {
         if tasks.is_empty() {
             continue;
         }
@@ -341,7 +394,10 @@ fn countdown(secs: i64) -> String {
 }
 
 /// The soonest item starting at or after `now` (first wins on ties).
-fn earliest<T>(now: NaiveDateTime, items: impl Iterator<Item = (NaiveDateTime, T)>) -> Option<(NaiveDateTime, T)> {
+fn earliest<T>(
+    now: NaiveDateTime,
+    items: impl Iterator<Item = (NaiveDateTime, T)>,
+) -> Option<(NaiveDateTime, T)> {
     items.filter(|(at, _)| *at >= now).min_by_key(|(at, _)| *at)
 }
 
@@ -374,7 +430,11 @@ fn parse_date_arg(s: &str, now: NaiveDateTime) -> Result<NaiveDate> {
 fn build_filter(args: &LsArgs, now: NaiveDateTime) -> Result<TaskFilter> {
     Ok(TaskFilter {
         status: args.status.map(Status::from).unwrap_or_default(),
-        date: args.date.as_deref().map(|s| parse_date_arg(s, now)).transpose()?,
+        date: args
+            .date
+            .as_deref()
+            .map(|s| parse_date_arg(s, now))
+            .transpose()?,
         undated: args.inbox,
         overdue: args.overdue,
         today: Some(now.date()),
@@ -384,7 +444,12 @@ fn build_filter(args: &LsArgs, now: NaiveDateTime) -> Result<TaskFilter> {
 }
 
 fn calendar_line(c: &Calendar) -> String {
-    format!("[{}] {}  ({})", if c.selected { 'x' } else { ' ' }, c.summary, c.id)
+    format!(
+        "[{}] {}  ({})",
+        if c.selected { 'x' } else { ' ' },
+        c.summary,
+        c.id
+    )
 }
 
 /// Find a calendar by exact id, else by case-insensitive name (must be unambiguous).
@@ -395,7 +460,9 @@ fn resolve_calendar<'a>(cals: &'a [Calendar], key: &str) -> Result<&'a Calendar>
     let mut named = cals.iter().filter(|c| c.summary.eq_ignore_ascii_case(key));
     match (named.next(), named.next()) {
         (Some(c), None) => Ok(c),
-        (Some(_), Some(_)) => bail!("calendar name {key:?} is ambiguous; use its id (see `{APP_NAME} calendars`)"),
+        (Some(_), Some(_)) => {
+            bail!("calendar name {key:?} is ambiguous; use its id (see `{APP_NAME} calendars`)")
+        }
         _ => bail!("no calendar matches {key:?} (see `{APP_NAME} calendars`)"),
     }
 }
@@ -448,7 +515,15 @@ mod tests {
     }
 
     fn ls_args() -> LsArgs {
-        LsArgs { date: None, tag: None, overdue: false, status: None, query: None, inbox: false, json: false }
+        LsArgs {
+            date: None,
+            tag: None,
+            overdue: false,
+            status: None,
+            query: None,
+            inbox: false,
+            json: false,
+        }
     }
 
     #[test]
@@ -473,9 +548,15 @@ mod tests {
         assert_eq!(fmt_due(day(2026, 11, 12), None, today), "yesterday");
         assert_eq!(fmt_due(day(2026, 11, 20), None, today), "Fri 20 Nov");
         assert_eq!(fmt_due(day(2027, 1, 5), None, today), "Tue 5 Jan 2027");
-        assert_eq!(fmt_due(today, NaiveTime::from_hms_opt(17, 5, 0), today), "today 17:05");
+        assert_eq!(
+            fmt_due(today, NaiveTime::from_hms_opt(17, 5, 0), today),
+            "today 17:05"
+        );
         // Year boundaries use calendar neighbours.
-        assert_eq!(fmt_due(day(2027, 1, 1), None, day(2026, 12, 31)), "tomorrow");
+        assert_eq!(
+            fmt_due(day(2027, 1, 1), None, day(2026, 12, 31)),
+            "tomorrow"
+        );
     }
 
     #[test]
@@ -487,7 +568,10 @@ mod tests {
         t.due_time = NaiveTime::from_hms_opt(17, 0, 0);
         t.priority = Priority::High;
         t.tags = vec!["home".into(), "money".into()];
-        assert_eq!(task_line(&t, today), "#7 [ ] pay rent  tomorrow 17:00  !high  #home #money");
+        assert_eq!(
+            task_line(&t, today),
+            "#7 [ ] pay rent  tomorrow 17:00  !high  #home #money"
+        );
         t.completed_at = Some(Utc::now());
         assert!(task_line(&t, today).starts_with("#7 [x] "));
         t.deleted_at = Some(Utc::now());
@@ -497,23 +581,57 @@ mod tests {
     #[test]
     fn event_lines() {
         let d = day(2026, 11, 13);
-        assert_eq!(event_line("Holiday", true, at(d, 0, 0), at(day(2026, 11, 14), 0, 0), d), "all day  Holiday");
-        assert_eq!(event_line("Standup", false, at(d, 9, 0), at(d, 9, 15), d), "09:00–09:15  Standup");
+        assert_eq!(
+            event_line("Holiday", true, at(d, 0, 0), at(day(2026, 11, 14), 0, 0), d),
+            "all day  Holiday"
+        );
+        assert_eq!(
+            event_line("Standup", false, at(d, 9, 0), at(d, 9, 15), d),
+            "09:00–09:15  Standup"
+        );
         // Spans crossing midnight.
-        assert_eq!(event_line("Flight", false, at(d, 22, 0), at(day(2026, 11, 14), 6, 30), d), "22:00–…  Flight");
-        assert_eq!(event_line("Flight", false, at(day(2026, 11, 12), 22, 0), at(d, 6, 30), d), "…–06:30  Flight");
+        assert_eq!(
+            event_line(
+                "Flight",
+                false,
+                at(d, 22, 0),
+                at(day(2026, 11, 14), 6, 30),
+                d
+            ),
+            "22:00–…  Flight"
+        );
+        assert_eq!(
+            event_line(
+                "Flight",
+                false,
+                at(day(2026, 11, 12), 22, 0),
+                at(d, 6, 30),
+                d
+            ),
+            "…–06:30  Flight"
+        );
         // Ending exactly at midnight is shown as an end time.
-        assert_eq!(event_line("Late", false, at(d, 22, 0), at(day(2026, 11, 14), 0, 0), d), "22:00–00:00  Late");
+        assert_eq!(
+            event_line("Late", false, at(d, 22, 0), at(day(2026, 11, 14), 0, 0), d),
+            "22:00–00:00  Late"
+        );
     }
 
     #[test]
     fn today_rendering() {
         let d = day(2026, 11, 13);
-        assert_eq!(render_today(d, &[], &TodayView::default()), "Friday 13 November\nNothing planned.\n");
+        assert_eq!(
+            render_today(d, &[], &TodayView::default()),
+            "Friday 13 November\nNothing planned.\n"
+        );
 
         let mut overdue = task(1, "old");
         overdue.due_date = Some(day(2026, 11, 10));
-        let view = TodayView { overdue: vec![overdue], due_today: vec![], inbox: vec![task(2, "someday")] };
+        let view = TodayView {
+            overdue: vec![overdue],
+            due_today: vec![],
+            inbox: vec![task(2, "someday")],
+        };
         let out = render_today(d, &["09:00–10:00  Standup".into()], &view);
         assert_eq!(
             out,
@@ -524,10 +642,18 @@ mod tests {
     #[test]
     fn earliest_ignores_the_past_and_prefers_first_on_tie() {
         let n = now();
-        let items = vec![(at(day(2026, 11, 13), 9, 0), "past"), (at(day(2026, 11, 13), 12, 0), "b"), (at(day(2026, 11, 13), 12, 0), "c"), (at(day(2026, 11, 14), 8, 0), "d")];
+        let items = vec![
+            (at(day(2026, 11, 13), 9, 0), "past"),
+            (at(day(2026, 11, 13), 12, 0), "b"),
+            (at(day(2026, 11, 13), 12, 0), "c"),
+            (at(day(2026, 11, 14), 8, 0), "d"),
+        ];
         assert_eq!(earliest(n, items.into_iter()).map(|x| x.1), Some("b"));
         // Starting exactly now counts as upcoming.
-        assert_eq!(earliest(n, vec![(n, "now")].into_iter()).map(|x| x.1), Some("now"));
+        assert_eq!(
+            earliest(n, vec![(n, "now")].into_iter()).map(|x| x.1),
+            Some("now")
+        );
         assert!(earliest(n, vec![(at(day(2026, 11, 13), 9, 59), "x")].into_iter()).is_none());
     }
 
@@ -549,11 +675,26 @@ mod tests {
         };
         let tk = task(1, "t");
         let (t10, t11) = (at(day(2026, 11, 13), 10, 0), at(day(2026, 11, 13), 11, 0));
-        assert!(matches!(pick_next(Some((t10, &ev)), Some((t11, &tk))), Some(Next::Event(..))));
-        assert!(matches!(pick_next(Some((t11, &ev)), Some((t10, &tk))), Some(Next::Task(..))));
-        assert!(matches!(pick_next(Some((t10, &ev)), Some((t10, &tk))), Some(Next::Event(..))));
-        assert!(matches!(pick_next(None, Some((t10, &tk))), Some(Next::Task(..))));
-        assert!(matches!(pick_next(Some((t10, &ev)), None), Some(Next::Event(..))));
+        assert!(matches!(
+            pick_next(Some((t10, &ev)), Some((t11, &tk))),
+            Some(Next::Event(..))
+        ));
+        assert!(matches!(
+            pick_next(Some((t11, &ev)), Some((t10, &tk))),
+            Some(Next::Task(..))
+        ));
+        assert!(matches!(
+            pick_next(Some((t10, &ev)), Some((t10, &tk))),
+            Some(Next::Event(..))
+        ));
+        assert!(matches!(
+            pick_next(None, Some((t10, &tk))),
+            Some(Next::Task(..))
+        ));
+        assert!(matches!(
+            pick_next(Some((t10, &ev)), None),
+            Some(Next::Event(..))
+        ));
         assert!(pick_next(None, None).is_none());
     }
 
@@ -574,7 +715,13 @@ mod tests {
     fn filter_from_args() {
         let n = now();
         let f = build_filter(&ls_args(), n).unwrap();
-        assert_eq!(f, TaskFilter { today: Some(n.date()), ..Default::default() });
+        assert_eq!(
+            f,
+            TaskFilter {
+                today: Some(n.date()),
+                ..Default::default()
+            }
+        );
         assert_eq!(f.status, Status::Open);
 
         let f = build_filter(
@@ -593,17 +740,39 @@ mod tests {
         assert_eq!(f.status, Status::Deleted);
         assert_eq!(f.query.as_deref(), Some("rent"));
 
-        let f = build_filter(&LsArgs { overdue: true, inbox: true, ..ls_args() }, n).unwrap();
+        let f = build_filter(
+            &LsArgs {
+                overdue: true,
+                inbox: true,
+                ..ls_args()
+            },
+            n,
+        )
+        .unwrap();
         assert!(f.overdue && f.undated);
-        assert!(build_filter(&LsArgs { date: Some("nope".into()), ..ls_args() }, n).is_err());
+        assert!(build_filter(
+            &LsArgs {
+                date: Some("nope".into()),
+                ..ls_args()
+            },
+            n
+        )
+        .is_err());
     }
 
     #[test]
     fn calendar_resolution_and_lines() {
-        let cals = vec![cal("a@x.com", "Work", true), cal("b@x.com", "Home", false), cal("c@x.com", "home", true)];
+        let cals = vec![
+            cal("a@x.com", "Work", true),
+            cal("b@x.com", "Home", false),
+            cal("c@x.com", "home", true),
+        ];
         assert_eq!(resolve_calendar(&cals, "a@x.com").unwrap().summary, "Work");
         assert_eq!(resolve_calendar(&cals, "WORK").unwrap().id, "a@x.com");
-        assert!(resolve_calendar(&cals, "home").unwrap_err().to_string().contains("ambiguous"));
+        assert!(resolve_calendar(&cals, "home")
+            .unwrap_err()
+            .to_string()
+            .contains("ambiguous"));
         assert!(resolve_calendar(&cals, "nope").is_err());
         assert_eq!(calendar_line(&cals[0]), "[x] Work  (a@x.com)");
         assert_eq!(calendar_line(&cals[1]), "[ ] Home  (b@x.com)");

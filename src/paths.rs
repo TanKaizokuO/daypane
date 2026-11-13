@@ -32,6 +32,7 @@ pub fn config_file() -> Result<PathBuf> {
 }
 
 /// `$XDG_CONFIG_HOME/$APP/style.css`
+#[cfg_attr(not(feature = "gui"), allow(dead_code))] // used by the popup
 pub fn style_file() -> Result<PathBuf> {
     Ok(config_dir()?.join("style.css"))
 }

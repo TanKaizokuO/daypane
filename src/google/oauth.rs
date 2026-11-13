@@ -33,8 +33,18 @@ pub struct Client<'a> {
 impl<'a> Client<'a> {
     /// `None` when no client id is configured.
     pub fn from_config(cfg: &'a Config) -> Option<Self> {
-        let id = cfg.google.client_id.as_deref().map(str::trim).filter(|s| !s.is_empty())?;
-        let secret = cfg.google.client_secret.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        let id = cfg
+            .google
+            .client_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())?;
+        let secret = cfg
+            .google
+            .client_secret
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
         Some(Self { id, secret })
     }
 
@@ -109,11 +119,17 @@ fn parse_callback(request_line: &str, expected_state: &str) -> Result<Callback> 
     if url.path() != "/" {
         return Ok(Callback::Ignore);
     }
-    let param = |name: &str| url.query_pairs().find(|(k, _)| k == name).map(|(_, v)| v.into_owned());
+    let param = |name: &str| {
+        url.query_pairs()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.into_owned())
+    };
     if let Some(err) = param("error") {
         bail!("Google denied the authorization request: {err}");
     }
-    let Some(code) = param("code") else { return Ok(Callback::Ignore) };
+    let Some(code) = param("code") else {
+        return Ok(Callback::Ignore);
+    };
     if param("state").as_deref() != Some(expected_state) {
         bail!("OAuth `state` mismatch; refusing the response (possible forged redirect)");
     }
@@ -163,7 +179,11 @@ fn await_code(listener: &TcpListener, state: &str) -> Result<String> {
             }
             Ok(Callback::Ignore) => respond(stream, "404 Not Found", "Not found"),
             Err(e) => {
-                respond(stream, "400 Bad Request", "Authorization failed. See the terminal.");
+                respond(
+                    stream,
+                    "400 Bad Request",
+                    "Authorization failed. See the terminal.",
+                );
                 return Err(e);
             }
         }
@@ -206,7 +226,10 @@ fn token_request(fields: &[(&str, &str)]) -> Result<TokenResponse> {
         .send_form(fields.iter().copied())
         .context("contacting Google's token endpoint")?;
     if resp.status().is_success() {
-        return resp.body_mut().read_json().context("decoding token response");
+        return resp
+            .body_mut()
+            .read_json()
+            .context("decoding token response");
     }
     let status = resp.status().as_u16();
     let body = resp.body_mut().read_to_string().unwrap_or_default();
@@ -223,21 +246,30 @@ fn token_error(status: u16, body: &str) -> anyhow::Error {
         Ok(e) => anyhow!(
             "Google token endpoint error `{}`{}",
             e.error,
-            e.error_description.map(|d| format!(": {d}")).unwrap_or_default()
+            e.error_description
+                .map(|d| format!(": {d}"))
+                .unwrap_or_default()
         ),
-        Err(_) => anyhow!("Google token endpoint returned HTTP {status}: {}", truncate(body, 300)),
+        Err(_) => anyhow!(
+            "Google token endpoint returned HTTP {status}: {}",
+            truncate(body, 300)
+        ),
     }
 }
 
 /// Short-lived access token from a stored refresh token.
 pub fn refresh_access_token(client: Client<'_>, refresh_token: &str) -> Result<String> {
-    token_request(&client.form(vec![("grant_type", "refresh_token"), ("refresh_token", refresh_token)]))
-        .map(|t| t.access_token)
+    token_request(&client.form(vec![
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh_token),
+    ]))
+    .map(|t| t.access_token)
 }
 
 /// Interactive authorization-code flow; returns the long-lived refresh token.
 pub fn authorize(client: Client<'_>) -> Result<String> {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).context("binding a loopback port for the OAuth redirect")?;
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .context("binding a loopback port for the OAuth redirect")?;
     let redirect_uri = format!("http://127.0.0.1:{}", listener.local_addr()?.port());
     let verifier = random_token();
     let state = random_token();
@@ -278,12 +310,19 @@ mod tests {
         let (a, b) = (random_token(), random_token());
         assert_ne!(a, b);
         assert_eq!(a.len(), 43);
-        assert!(a.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_'));
+        assert!(a
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_'));
     }
 
     #[test]
     fn auth_url_has_all_required_parameters() {
-        let url = auth_url("cid.apps.googleusercontent.com", "http://127.0.0.1:4242", "CHAL", "ST");
+        let url = auth_url(
+            "cid.apps.googleusercontent.com",
+            "http://127.0.0.1:4242",
+            "CHAL",
+            "ST",
+        );
         assert_eq!(url.host_str(), Some("accounts.google.com"));
         assert_eq!(url.path(), "/o/oauth2/v2/auth");
         let q: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
@@ -326,19 +365,36 @@ mod tests {
 
     #[test]
     fn unrelated_requests_are_ignored() {
-        for line in ["GET /favicon.ico HTTP/1.1", "GET / HTTP/1.1", "POST /?code=c&state=xyz HTTP/1.1", ""] {
-            assert_eq!(parse_callback(line, "xyz").unwrap(), Callback::Ignore, "{line:?}");
+        for line in [
+            "GET /favicon.ico HTTP/1.1",
+            "GET / HTTP/1.1",
+            "POST /?code=c&state=xyz HTTP/1.1",
+            "",
+        ] {
+            assert_eq!(
+                parse_callback(line, "xyz").unwrap(),
+                Callback::Ignore,
+                "{line:?}"
+            );
         }
     }
 
     #[test]
     fn token_errors_are_readable() {
-        let e = token_error(400, r#"{"error":"invalid_grant","error_description":"Token has been expired or revoked."}"#);
+        let e = token_error(
+            400,
+            r#"{"error":"invalid_grant","error_description":"Token has been expired or revoked."}"#,
+        );
         let msg = e.to_string();
         assert!(msg.contains("login") && msg.contains("revoked"), "{msg}");
-        let e = token_error(401, r#"{"error":"invalid_client","error_description":"Unauthorized"}"#);
+        let e = token_error(
+            401,
+            r#"{"error":"invalid_client","error_description":"Unauthorized"}"#,
+        );
         assert!(e.to_string().contains("invalid_client"));
-        assert!(token_error(502, "<html>bad gateway</html>").to_string().contains("502"));
+        assert!(token_error(502, "<html>bad gateway</html>")
+            .to_string()
+            .contains("502"));
     }
 
     #[test]
@@ -353,7 +409,9 @@ mod tests {
         let c = Client::from_config(&cfg).unwrap();
         assert_eq!((c.id, c.secret), ("id", Some("sec")));
         let fields = c.form(vec![("grant_type", "refresh_token")]);
-        assert!(fields.contains(&("client_secret", "sec")) && fields.contains(&("client_id", "id")));
+        assert!(
+            fields.contains(&("client_secret", "sec")) && fields.contains(&("client_id", "id"))
+        );
     }
 
     #[test]
@@ -366,7 +424,11 @@ mod tests {
                 write!(s, "GET {target} HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
                 let mut resp = String::new();
                 s.read_to_string(&mut resp).unwrap();
-                assert!(resp.starts_with(if target == "/favicon.ico" { "HTTP/1.1 404" } else { "HTTP/1.1 200" }));
+                assert!(resp.starts_with(if target == "/favicon.ico" {
+                    "HTTP/1.1 404"
+                } else {
+                    "HTTP/1.1 200"
+                }));
             }
         });
         assert_eq!(await_code(&listener, "S").unwrap(), "THE_CODE");

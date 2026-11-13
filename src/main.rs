@@ -7,9 +7,9 @@ mod db;
 mod google;
 mod install;
 mod mcp;
+mod paths;
 #[cfg(feature = "gui")]
 mod popup;
-mod paths;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -62,7 +62,9 @@ fn main() -> Result<()> {
         #[cfg(feature = "gui")]
         Cmd::Popup => popup::run(),
         #[cfg(not(feature = "gui"))]
-        Cmd::Popup => anyhow::bail!("built without the `gui` feature; rebuild with default features"),
+        Cmd::Popup => {
+            anyhow::bail!("built without the `gui` feature; rebuild with default features")
+        }
         Cmd::Daemon => daemon::run(),
         Cmd::Mcp => mcp::run(),
         Cmd::Install(a) => install::run(a),

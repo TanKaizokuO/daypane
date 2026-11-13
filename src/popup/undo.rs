@@ -20,7 +20,11 @@ pub enum Action {
 impl Action {
     pub fn task_id(&self) -> i64 {
         match self {
-            Self::Complete(id) | Self::Reopen(id) | Self::Delete(id) | Self::Restore(id) | Self::Patch(id, _) => *id,
+            Self::Complete(id)
+            | Self::Reopen(id)
+            | Self::Delete(id)
+            | Self::Restore(id)
+            | Self::Patch(id, _) => *id,
         }
     }
 
@@ -95,7 +99,10 @@ impl UndoStack {
         if self.entries.len() == MAX_UNDO {
             self.entries.remove(0);
         }
-        self.entries.push(UndoEntry { label, action: inverse });
+        self.entries.push(UndoEntry {
+            label,
+            action: inverse,
+        });
     }
 
     pub fn pop(&mut self) -> Option<UndoEntry> {
@@ -143,8 +150,28 @@ mod tests {
 
     fn same(a: &Task, b: &Task) {
         assert_eq!(
-            (&a.title, a.due_date, a.due_time, &a.notes, a.priority, &a.tags, &a.links, a.completed_at, a.deleted_at),
-            (&b.title, b.due_date, b.due_time, &b.notes, b.priority, &b.tags, &b.links, b.completed_at, b.deleted_at)
+            (
+                &a.title,
+                a.due_date,
+                a.due_time,
+                &a.notes,
+                a.priority,
+                &a.tags,
+                &a.links,
+                a.completed_at,
+                a.deleted_at
+            ),
+            (
+                &b.title,
+                b.due_date,
+                b.due_time,
+                &b.notes,
+                b.priority,
+                &b.tags,
+                &b.links,
+                b.completed_at,
+                b.deleted_at
+            )
         );
     }
 
@@ -187,7 +214,10 @@ mod tests {
     fn edit_inverse_restores_time_cleared_with_date() {
         let db = Db::open_in_memory().unwrap();
         let t = timed(&db);
-        let patch = TaskPatch { due_date: Some(None), ..Default::default() };
+        let patch = TaskPatch {
+            due_date: Some(None),
+            ..Default::default()
+        };
         let (before, after) = round_trip(&db, Action::Patch(t.id, patch));
         same(&before, &after);
         assert_eq!(after.due_time, NaiveTime::from_hms_opt(17, 0, 0));
@@ -196,7 +226,12 @@ mod tests {
     #[test]
     fn edit_inverse_restores_date_and_time_set_together() {
         let db = Db::open_in_memory().unwrap();
-        let t = db.create_task(NewTask { title: "x".into(), ..Default::default() }).unwrap();
+        let t = db
+            .create_task(NewTask {
+                title: "x".into(),
+                ..Default::default()
+            })
+            .unwrap();
         let patch = TaskPatch {
             due_date: Some(Some(d("2026-11-20"))),
             due_time: Some(NaiveTime::from_hms_opt(8, 30, 0)),
@@ -225,6 +260,9 @@ mod tests {
             stack.push(String::new(), Action::Delete(i));
         }
         assert_eq!(stack.len(), MAX_UNDO);
-        assert_eq!(stack.pop().unwrap().action, Action::Delete(MAX_UNDO as i64 + 9));
+        assert_eq!(
+            stack.pop().unwrap().action,
+            Action::Delete(MAX_UNDO as i64 + 9)
+        );
     }
 }

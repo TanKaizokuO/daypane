@@ -55,7 +55,9 @@ async fn serve(cfg: Config) -> Result<()> {
     let _watcher = match watch_db(db_tx) {
         Ok(w) => Some(w),
         Err(e) => {
-            log(format_args!("cannot watch the database ({e:#}); relying on the periodic tick"));
+            log(format_args!(
+                "cannot watch the database ({e:#}); relying on the periodic tick"
+            ));
             None
         }
     };
@@ -119,7 +121,10 @@ fn fire_due_reminders(
     earliest_ts: i64,
     now_ts: i64,
 ) -> Result<()> {
-    let events = db.events_between(now_ts - reminders::GRACE_SECS, now_ts + reminders::HORIZON_SECS)?;
+    let events = db.events_between(
+        now_ts - reminders::GRACE_SECS,
+        now_ts + reminders::HORIZON_SECS,
+    )?;
     let calendars = db.calendars()?;
     let today = Local::now().date_naive();
     let tasks = db.timed_tasks_from(today.pred_opt().unwrap_or(today))?;
@@ -135,7 +140,10 @@ fn fire_due_reminders(
     );
     for r in due {
         if db.mark_fired(&r.key, now_ts)? {
-            let _ = notifier.send(notify::Notification { title: r.title, body: r.body });
+            let _ = notifier.send(notify::Notification {
+                title: r.title,
+                body: r.body,
+            });
         }
     }
     Ok(())
@@ -162,23 +170,35 @@ fn watch_db(tx: UnboundedSender<()>) -> Result<notify_crate::RecommendedWatcher>
     use notify_crate::{EventKind, RecursiveMode, Watcher};
 
     let db_path = paths::db_file()?;
-    let dir: PathBuf = db_path.parent().context("db path has no parent")?.to_owned();
-    let db_name = db_path.file_name().context("db path has no file name")?.to_string_lossy().into_owned();
+    let dir: PathBuf = db_path
+        .parent()
+        .context("db path has no parent")?
+        .to_owned();
+    let db_name = db_path
+        .file_name()
+        .context("db path has no file name")?
+        .to_string_lossy()
+        .into_owned();
 
-    let mut watcher = notify_crate::recommended_watcher(move |res: notify_crate::Result<notify_crate::Event>| {
-        let Ok(ev) = res else { return };
-        if !matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) {
-            return;
-        }
-        let relevant = ev.paths.iter().any(|p| {
-            p.file_name()
-                .map(|n| n.to_string_lossy())
-                .is_some_and(|n| n.starts_with(&db_name) && !n.ends_with("-shm"))
-        });
-        if relevant {
-            let _ = tx.send(());
-        }
-    })?;
+    let mut watcher = notify_crate::recommended_watcher(
+        move |res: notify_crate::Result<notify_crate::Event>| {
+            let Ok(ev) = res else { return };
+            if !matches!(
+                ev.kind,
+                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+            ) {
+                return;
+            }
+            let relevant = ev.paths.iter().any(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy())
+                    .is_some_and(|n| n.starts_with(&db_name) && !n.ends_with("-shm"))
+            });
+            if relevant {
+                let _ = tx.send(());
+            }
+        },
+    )?;
     watcher.watch(&dir, RecursiveMode::NonRecursive)?;
     Ok(watcher)
 }
@@ -186,7 +206,10 @@ fn watch_db(tx: UnboundedSender<()>) -> Result<notify_crate::RecommendedWatcher>
 /// Periodic Google sync. Errors are logged and never stop the daemon; "not configured" is
 /// reported once.
 async fn sync_loop(startup_cfg: Config) {
-    let secs = startup_cfg.google.sync_interval_seconds.max(MIN_SYNC_INTERVAL_SECS);
+    let secs = startup_cfg
+        .google
+        .sync_interval_seconds
+        .max(MIN_SYNC_INTERVAL_SECS);
     let mut tick = interval(Duration::from_secs(secs));
     tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
     let mut told_unconfigured = false;

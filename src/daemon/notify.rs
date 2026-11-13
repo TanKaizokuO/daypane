@@ -53,7 +53,9 @@ impl Snoozes {
     }
 
     fn take_due(&mut self, now_ts: i64) -> Vec<Notification> {
-        let (due, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.0).into_iter().partition(|(ts, _)| *ts <= now_ts);
+        let (due, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.0)
+            .into_iter()
+            .partition(|(ts, _)| *ts <= now_ts);
         self.0 = rest;
         due.into_iter().map(|(_, n)| n).collect()
     }
@@ -119,13 +121,19 @@ async fn run(mut rx: UnboundedReceiver<Notification>, snooze_minutes: i64) {
 
         for n in to_show {
             if supports_actions.is_none() {
-                supports_actions = capabilities(&conn).await.map(|c| c.iter().any(|c| c == "actions")).ok();
+                supports_actions = capabilities(&conn)
+                    .await
+                    .map(|c| c.iter().any(|c| c == "actions"))
+                    .ok();
             }
             match notify(&conn, &n, supports_actions.unwrap_or(false)).await {
                 Ok(id) => {
                     shown.insert(id, n);
                 }
-                Err(e) => eprintln!("{APP_NAME} daemon: notification failed: {e:#} (title: {})", n.title),
+                Err(e) => eprintln!(
+                    "{APP_NAME} daemon: notification failed: {e:#} (title: {})",
+                    n.title
+                ),
             }
         }
     }
@@ -153,7 +161,9 @@ async fn signal_stream(conn: &Connection, member: &'static str) -> Option<Messag
 
 /// Next message of an optional stream; pends forever when there is no stream or it ended.
 async fn next(stream: &mut Option<MessageStream>) -> Option<Message> {
-    let Some(s) = stream.as_mut() else { return std::future::pending().await };
+    let Some(s) = stream.as_mut() else {
+        return std::future::pending().await;
+    };
     match poll_fn(|cx| Pin::new(&mut *s).poll_next(cx)).await {
         Some(Ok(m)) => Some(m),
         Some(Err(_)) => None,
@@ -173,7 +183,11 @@ async fn capabilities(conn: &Connection) -> Result<Vec<String>> {
 }
 
 async fn notify(conn: &Connection, n: &Notification, with_actions: bool) -> Result<u32> {
-    let actions: Vec<&str> = if with_actions { vec!["open", "Open", "snooze", "Snooze"] } else { vec![] };
+    let actions: Vec<&str> = if with_actions {
+        vec!["open", "Open", "snooze", "Snooze"]
+    } else {
+        vec![]
+    };
     let hints: HashMap<&str, Variant> = HashMap::from([("desktop-entry", Variant::from(APP_ID))]);
     let reply = conn
         .call_method(
@@ -181,7 +195,16 @@ async fn notify(conn: &Connection, n: &Notification, with_actions: bool) -> Resu
             PATH,
             Some(DEST),
             "Notify",
-            &(APP_NAME, 0u32, "", n.title.as_str(), n.body.as_str(), actions, hints, -1i32),
+            &(
+                APP_NAME,
+                0u32,
+                "",
+                n.title.as_str(),
+                n.body.as_str(),
+                actions,
+                hints,
+                -1i32,
+            ),
         )
         .await
         .context("Notify")?;
@@ -208,7 +231,10 @@ mod tests {
     use super::*;
 
     fn n(t: &str) -> Notification {
-        Notification { title: t.into(), body: String::new() }
+        Notification {
+            title: t.into(),
+            body: String::new(),
+        }
     }
 
     #[test]

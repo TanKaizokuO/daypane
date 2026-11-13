@@ -8,19 +8,10 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-/// `CARGO_BIN_EXE_<crate name>` is a compile-time variable whose name embeds the crate name,
-/// which `env!` cannot build; locate the binary next to the test executable instead.
+/// Cargo's path to the built binary. The variable name embeds the crate name, which must not
+/// be written literally (scripts/check-name.sh), so it is assembled at compile time.
 fn bin() -> PathBuf {
-    let mut p = std::env::current_exe().unwrap();
-    p.pop(); // deps/
-    p.pop(); // debug/ or release/
-    p.push(format!(
-        "{}{}",
-        env!("CARGO_PKG_NAME"),
-        std::env::consts::EXE_SUFFIX
-    ));
-    assert!(p.exists(), "binary not built at {}", p.display());
-    p
+    PathBuf::from(env!(concat!("CARGO_BIN_EXE_", env!("CARGO_PKG_NAME"))))
 }
 
 struct Client {

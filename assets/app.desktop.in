@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=@APP_TITLE@
+Comment=Calendar and task popup
+Exec=@EXEC@ popup
+Icon=x-office-calendar
+Terminal=false
+NoDisplay=true
+Categories=Utility;
+StartupWMClass=@APP_ID@

@@ -1,0 +1,13 @@
+[Unit]
+Description=@APP_TITLE@ daemon (calendar sync, reminders, Waybar output)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@EXEC@ daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

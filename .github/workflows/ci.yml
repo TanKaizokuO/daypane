@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ripgrep (needed by scripts/check-name.sh)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Check the app name is defined only in Cargo.toml
+        run: scripts/check-name.sh
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The GUI (`gui` feature: GTK 4.14 + gtk4-layer-shell) is not built in CI because
+      # gtk4-layer-shell 1.x is not packaged for ubuntu-latest. CI covers everything else.
+      - run: cargo fmt --check
+      - run: cargo clippy --no-default-features --all-targets -- -D warnings
+      - run: cargo test --no-default-features

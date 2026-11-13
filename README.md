@@ -2,7 +2,7 @@
 
 A Waybar popup for Linux: **Google Calendar (read-only) on the left, a local task list on the right** — and the task list can be driven by AI agents over MCP.
 
-Click a Waybar module and a layer-shell overlay opens with a month grid, the selected day's Google events, and your tasks (Overdue → Due today → Inbox). Everything is keyboard-driven, tasks live in a local SQLite file, and Google access is read-only with *your own* OAuth client — no bundled credentials, nothing hosted.
+Hover over a centered clock pill or click an optional Waybar module and a layer-shell overlay opens with a month grid, the selected day's Google events, and your tasks (Overdue → Due today → Inbox). Everything is keyboard-driven, tasks live in a local SQLite file, and Google access is read-only with *your own* OAuth client — no bundled credentials, nothing hosted.
 
 ## Features
 
@@ -53,7 +53,7 @@ The GTK popup is behind the `gui` cargo feature (on by default). Everything else
 cargo build --no-default-features
 ```
 
-`daypane popup` is unavailable in such a build. CI builds this way (GTK 4.14 + gtk4-layer-shell are not available on its runners).
+`daypane popup` and `daypane hotzone` are unavailable in such a build. CI builds this way (GTK 4.14 + gtk4-layer-shell are not available on its runners).
 
 ## Install
 
@@ -67,7 +67,7 @@ daypane install
 1. writes the systemd user unit to `$XDG_CONFIG_HOME/systemd/user/daypane.service` and runs `systemctl --user daemon-reload` and `systemctl --user enable --now daypane.service`;
 2. writes a `.desktop` file to `$XDG_DATA_HOME/applications/io.github.TanKaizokuO.daypane.desktop` (needed so notifications can open the popup);
 3. creates a commented default `config.toml` — only if you don't have one yet;
-4. prints the Waybar module and CSS snippets to add.
+4. prints the optional Waybar module and CSS snippets and a sway hover-zone startup hint.
 
 Options:
 
@@ -121,6 +121,16 @@ Google requires every app that touches Calendar data to use an OAuth client. day
    The daemon syncs every `sync_interval_seconds` (default 300).
 
 ## Waybar
+
+To open the centered popup by hovering over Waybar's centered clock, add this to your sway config and start it in your session:
+
+```sh
+exec daypane hotzone
+```
+
+The invisible zone sits over the top-center of the screen, so adjust `[hover] width` and `height` to match the clock pill. It intercepts pointer input in that area. Hovering for `delay_ms` opens the popup without toggling an already-open popup; moving away before the delay cancels it. Set `[hover] enabled = false` to disable the zone. The hotzone requires a layer-shell compositor and is independent of the daemon.
+
+The separate task pill is optional:
 
 Add the module printed by `daypane install` to your Waybar config (`~/.config/waybar/config.jsonc`) and list it in a `modules-*` array:
 
@@ -184,7 +194,7 @@ exec-once = daypane daemon
 | `/`                  | Search tasks and cached events          |
 | `Esc`                | Close                                   |
 
-Running `daypane popup` while the popup is open toggles it closed. It also closes when it loses focus.
+Running `daypane popup` while the popup is open toggles it closed. `daypane popup --show` opens it if closed and leaves it open otherwise. It also closes when it loses focus.
 
 ## Quick capture syntax
 
@@ -210,7 +220,8 @@ daypane <COMMAND>
 
 | Command                    | Description                                                              |
 | -------------------------- | ------------------------------------------------------------------------ |
-| `popup`                    | Toggle the popup window (single instance). Requires the `gui` build.     |
+| `popup [--show]`           | Toggle the popup, or show it without closing it. Requires the `gui` build. |
+| `hotzone`                  | Run the single-instance centered hover zone. Requires the `gui` build.    |
 | `daemon`                   | Background service: Google sync, reminders, Waybar output.               |
 | `mcp`                      | MCP server over stdio (tasks only).                                      |
 | `install [--print] [--no-systemd]` | Install the unit and `.desktop` file, print Waybar snippets.     |
@@ -283,11 +294,16 @@ Tools:
 
 | Section       | Key                    | Default | Description                                                              |
 | ------------- | ---------------------- | ------- | ------------------------------------------------------------------------ |
-| `[popup]`     | `margin_top`           | `8`     | Distance from the top screen edge (px)                                   |
-|               | `margin_right`         | `8`     | Distance from the right screen edge (px)                                 |
+| `[popup]`     | `position`             | `"center"` | Horizontal placement: `"center"` or `"right"`                        |
+|               | `margin_top`           | `8`     | Distance from the top edge of the available area (px)                    |
+|               | `margin_right`         | `8`     | Distance from the right edge when position is `"right"` (px)            |
 |               | `width`                | `760`   | Popup width (px)                                                         |
 |               | `height`               | `480`   | Popup height (px)                                                        |
 |               | `theme`                | `"dark"`| `"dark"`, `"light"`, or `"system"` (keep the GTK theme's own setting)     |
+| `[hover]`     | `enabled`              | `true`  | Enable the hotzone when its command is run                               |
+|               | `width`                | `190`   | Centered hover zone width (px)                                           |
+|               | `height`               | `40`    | Hover zone height (px)                                                   |
+|               | `delay_ms`             | `150`   | Pointer dwell time before showing the popup (ms)                         |
 | `[reminders]` | `task_offset_minutes`  | `10`    | Minutes before a task's `due_time` to notify                             |
 |               | `snooze_minutes`       | `10`    | Duration of the notification "Snooze" action                             |
 | `[google]`    | `client_id`            | unset   | OAuth "Desktop app" client ID from your own Google Cloud project         |

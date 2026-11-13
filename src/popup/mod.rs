@@ -5,6 +5,7 @@
 
 mod form;
 mod format;
+pub mod hotzone;
 mod layout;
 mod render;
 mod ui;
@@ -16,7 +17,7 @@ use std::rc::Rc;
 
 use anyhow::{bail, Context, Result};
 use gtk::prelude::*;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 use gtk4 as gtk;
 
 use crate::app::APP_ID;
@@ -28,19 +29,45 @@ const DEFAULT_CSS: &str = include_str!("default.css");
 /// Dark palette layered over `DEFAULT_CSS` for `Theme::Dark`.
 const DARK_CSS: &str = include_str!("dark.css");
 
-/// Run the popup. A second invocation while one is open toggles it closed.
-pub fn run() -> Result<()> {
-    let cfg = Config::load()?;
+/// Run the popup, toggling an existing window unless `show` is requested.
+pub fn run(show: bool) -> Result<()> {
+    let cfg = Rc::new(Config::load()?);
     let app = gtk::Application::builder().application_id(APP_ID).build();
     let failure: Rc<RefCell<Option<anyhow::Error>>> = Rc::new(RefCell::new(None));
 
     let slot = failure.clone();
+    let toggle_cfg = cfg.clone();
     app.connect_activate(move |app| {
-        if let Err(e) = activate(app, &cfg) {
+        if let Err(e) = activate(app, &toggle_cfg, false) {
             *slot.borrow_mut() = Some(e);
             app.quit();
         }
     });
+
+    let action = gio::SimpleAction::new("show", None);
+    let slot = failure.clone();
+    let weak_app = app.downgrade();
+    action.connect_activate(move |_, _| {
+        if let Some(app) = weak_app.upgrade() {
+            if let Err(e) = activate(&app, &cfg, true) {
+                *slot.borrow_mut() = Some(e);
+                app.quit();
+            }
+        }
+    });
+    app.add_action(&action);
+    app.register(None::<&gio::Cancellable>)?;
+    if app.is_remote() {
+        if show {
+            app.activate_action("show", None);
+        } else {
+            app.activate();
+        }
+        if let Some(connection) = app.dbus_connection() {
+            connection.flush_sync(None::<&gio::Cancellable>)?;
+        }
+        return Ok(());
+    }
 
     // GTK must not parse our subcommand as its own options.
     let code = app.run_with_args::<&str>(&[]);
@@ -53,15 +80,15 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-fn activate(app: &gtk::Application, cfg: &Config) -> Result<()> {
-    // Already running: toggle.
+fn activate(app: &gtk::Application, cfg: &Config, show: bool) -> Result<()> {
+    // Existing windows are only closed by toggle requests.
     if let Some(window) = app
         .active_window()
         .or_else(|| app.windows().into_iter().next())
     {
-        if window.is_visible() {
+        if window.is_visible() && !show {
             window.close();
-        } else {
+        } else if !window.is_visible() {
             window.present();
         }
         return Ok(());

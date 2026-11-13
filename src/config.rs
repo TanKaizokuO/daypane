@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub popup: PopupConfig,
+    pub hover: HoverConfig,
     pub reminders: ReminderConfig,
     pub google: GoogleConfig,
     pub waybar: WaybarConfig,
@@ -17,11 +18,30 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PopupConfig {
+    pub position: Position,
     pub margin_top: i32,
     pub margin_right: i32,
     pub width: i32,
     pub height: i32,
     pub theme: Theme,
+}
+
+/// Horizontal popup placement.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Position {
+    #[default]
+    Center,
+    Right,
+}
+
+impl Position {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Center => "center",
+            Self::Right => "right",
+        }
+    }
 }
 
 /// Popup colour scheme. `Dark`/`Light` select the GTK theme's dark/light variant;
@@ -48,11 +68,32 @@ impl Theme {
 impl Default for PopupConfig {
     fn default() -> Self {
         Self {
+            position: Position::Center,
             margin_top: 8,
             margin_right: 8,
             width: 760,
             height: 480,
             theme: Theme::Dark,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct HoverConfig {
+    pub enabled: bool,
+    pub width: i32,
+    pub height: i32,
+    pub delay_ms: u64,
+}
+
+impl Default for HoverConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            width: 190,
+            height: 40,
+            delay_ms: 150,
         }
     }
 }
@@ -133,6 +174,38 @@ mod tests {
         assert_eq!(c.reminders.task_offset_minutes, 30);
         assert_eq!(c.reminders.snooze_minutes, 10);
         assert_eq!(c.popup.margin_top, 8);
+    }
+
+    #[test]
+    fn popup_and_hover_defaults_and_parsing() {
+        let defaults: Config = toml::from_str("").unwrap();
+        assert_eq!(defaults.popup.position, Position::Center);
+        assert!(defaults.hover.enabled);
+        assert_eq!(
+            (
+                defaults.hover.width,
+                defaults.hover.height,
+                defaults.hover.delay_ms
+            ),
+            (190, 40, 150)
+        );
+
+        let config: Config = toml::from_str(
+            "[popup]\nposition = \"right\"\n[hover]\nenabled = false\nwidth = 220\nheight = 30\ndelay_ms = 75\n",
+        )
+        .unwrap();
+        assert_eq!(config.popup.position, Position::Right);
+        assert!(!config.hover.enabled);
+        assert_eq!(
+            (
+                config.hover.width,
+                config.hover.height,
+                config.hover.delay_ms
+            ),
+            (220, 30, 75)
+        );
+        assert!(toml::from_str::<Config>("[popup]\nposition = \"left\"").is_err());
+        assert!(toml::from_str::<Config>("[hover]\nunknown = true").is_err());
     }
 
     #[test]

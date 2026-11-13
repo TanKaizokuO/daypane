@@ -73,11 +73,16 @@ impl Vars {
     fn for_config(c: &Config) -> Self {
         Self::default()
             .with("APP_NAME", APP_NAME)
+            .with("POPUP_POSITION", c.popup.position.as_str())
             .with("POPUP_MARGIN_TOP", c.popup.margin_top.to_string())
             .with("POPUP_MARGIN_RIGHT", c.popup.margin_right.to_string())
             .with("POPUP_WIDTH", c.popup.width.to_string())
             .with("POPUP_HEIGHT", c.popup.height.to_string())
             .with("POPUP_THEME", c.popup.theme.as_str())
+            .with("HOVER_ENABLED", c.hover.enabled.to_string())
+            .with("HOVER_WIDTH", c.hover.width.to_string())
+            .with("HOVER_HEIGHT", c.hover.height.to_string())
+            .with("HOVER_DELAY_MS", c.hover.delay_ms.to_string())
             .with(
                 "REMINDERS_TASK_OFFSET_MINUTES",
                 c.reminders.task_offset_minutes.to_string(),
@@ -268,6 +273,12 @@ fn print_exec_fallback(exec: &Path) {
     println!();
 }
 
+fn print_hotzone_help(exec: &Path) {
+    let exec = shell_quote(&exec.to_string_lossy());
+    println!("# ── Hover zone (add to your sway config) ──");
+    println!("  exec {exec} hotzone\n");
+}
+
 pub fn run(args: InstallArgs) -> Result<()> {
     let exec = std::env::current_exe()
         .and_then(|p| p.canonicalize())
@@ -299,6 +310,7 @@ pub fn run(args: InstallArgs) -> Result<()> {
             print_exec_fallback(&exec);
         }
         print_waybar_help(&rendered);
+        print_hotzone_help(&exec);
         return Ok(());
     }
 
@@ -339,6 +351,7 @@ pub fn run(args: InstallArgs) -> Result<()> {
         );
     }
     print_waybar_help(&rendered);
+    print_hotzone_help(&exec);
 
     match systemd_error {
         Some(e) => Err(e.context(format!(

@@ -17,7 +17,7 @@ use super::layout::{self, Step};
 use super::undo::{Action, UndoStack};
 use crate::app::APP_NAME;
 use crate::capture;
-use crate::config::Config;
+use crate::config::{Config, Position};
 use crate::db::{Db, TaskPatch};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -158,9 +158,11 @@ impl Ui {
             window.init_layer_shell();
             window.set_layer(Layer::Overlay);
             window.set_anchor(Edge::Top, true);
-            window.set_anchor(Edge::Right, true);
             window.set_margin(Edge::Top, cfg.popup.margin_top);
-            window.set_margin(Edge::Right, cfg.popup.margin_right);
+            if cfg.popup.position == Position::Right {
+                window.set_anchor(Edge::Right, true);
+                window.set_margin(Edge::Right, cfg.popup.margin_right);
+            }
             window.set_keyboard_mode(KeyboardMode::OnDemand);
             window.set_namespace(Some(APP_NAME));
         } else {

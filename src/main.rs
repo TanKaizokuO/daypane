@@ -23,8 +23,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Toggle the popup window (single instance).
-    Popup,
+    /// Toggle the popup, or show it without closing an open window.
+    Popup {
+        /// Show the popup without toggling it closed.
+        #[arg(long)]
+        show: bool,
+    },
+    /// Run the invisible hover zone for the centered clock.
+    Hotzone,
     /// Background service: Google sync, reminders, Waybar output.
     Daemon,
     /// MCP server over stdio (tasks only).
@@ -60,9 +66,11 @@ enum Cmd {
 fn main() -> Result<()> {
     match Cli::parse().cmd {
         #[cfg(feature = "gui")]
-        Cmd::Popup => popup::run(),
+        Cmd::Popup { show } => popup::run(show),
+        #[cfg(feature = "gui")]
+        Cmd::Hotzone => popup::hotzone::run(),
         #[cfg(not(feature = "gui"))]
-        Cmd::Popup => {
+        Cmd::Popup { .. } | Cmd::Hotzone => {
             anyhow::bail!("built without the `gui` feature; rebuild with default features")
         }
         Cmd::Daemon => daemon::run(),

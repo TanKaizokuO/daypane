@@ -9,7 +9,7 @@
 Public, open-source Waybar popup: **Google Calendar (read-only) on the left, a local task list on the right**, with the task list drivable by AI agents over MCP. Differentiator vs Waycal/mycal: real Google integration done right + agent-native tasks.
 
 ## Stack
-- Rust, single binary, subcommands: `popup | daemon | mcp | install | login | calendars | add | today | next | done | reopen | rm | restore | ls`.
+- Rust, single binary, subcommands: `popup | hotzone | daemon | mcp | install | login | calendars | add | today | next | done | reopen | rm | restore | ls`.
 - gtk4-rs + gtk4-layer-shell; rusqlite (WAL); `rmcp` (official Rust MCP SDK).
 - Paths via XDG: `$XDG_CONFIG_HOME/$APP/config.toml`, `$XDG_DATA_HOME/$APP/$APP.db`, `$XDG_CONFIG_HOME/$APP/style.css`.
 
@@ -39,12 +39,16 @@ Public, open-source Waybar popup: **Google Calendar (read-only) on the left, a l
 - Notifications via `org.freedesktop.Notifications` with actions (Open, Snooze) where the server supports them.
 
 ## Popup (`$APP popup`)
-- Single instance via GApplication (`APP_ID`); second invocation toggles closed.
-- Layer-shell overlay, anchored top-right (configurable margins), keyboard mode `OnDemand`; closes on Esc or focus loss.
+- Single instance via GApplication (`APP_ID`); second invocation toggles closed. `$APP popup --show` opens if closed and otherwise leaves it open.
+- Layer-shell overlay, anchored top-center by default, or top-right with `[popup] position = "right"`; `margin_top` applies in both modes, `margin_right` only on the right. Keyboard mode `OnDemand`; closes on Esc or focus loss.
 - Reloads on DB file change (inotify), so MCP/CLI/daemon writes appear live.
 - **Left pane:** month grid; below it the selected day's Google events (read-only, Meet link if present).
 - **Right pane:** with no date selected, Today = Overdue → Due today → collapsible Inbox (undated). Clicking a date shows that date's tasks (Inbox hidden).
 - Theming: dark by default (`[popup] theme = dark|light|system`); built-in dark palette over the GTK theme's dark variant; user `style.css` override.
+
+## Hover zone (`$APP hotzone`)
+- Separate single-instance GTK application with an invisible top-centered layer-shell overlay, exclusive zone `-1`, and no keyboard focus. Run it from the compositor session (e.g. sway `exec $APP hotzone`).
+- `[hover]` defaults: `enabled = true`, `width = 190`, `height = 40`, `delay_ms = 150`. If disabled, the command exits successfully. Pointer entry starts the delay; leaving cancels it; expiry invokes `$APP popup --show`. The surface intercepts pointer input over the configured area.
 
 ## Input
 - Vim-style: `h/j/k/l` + arrows move days; `Tab` switches panes; `j/k` tasks; `x` complete; `e` edit; `d` trash; `u` undo; `t` today; `N` capture; `/` search; `Esc` close.

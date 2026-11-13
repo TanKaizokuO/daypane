@@ -1,13 +1,22 @@
 # @APP_NAME@ configuration. Every key is optional; the values shown are the defaults.
 
 [popup]
-# Distance (px) from the top-right corner of the screen, and the popup size.
+# "center" or "right"; right margin applies only to right placement.
+position = "@POPUP_POSITION@"
+# Distance (px) from the top and right edges, and the popup size.
 margin_top = @POPUP_MARGIN_TOP@
 margin_right = @POPUP_MARGIN_RIGHT@
 width = @POPUP_WIDTH@
 height = @POPUP_HEIGHT@
 # Colour scheme: "dark", "light", or "system" (leave the GTK setting alone).
 theme = "@POPUP_THEME@"
+
+[hover]
+# Start the hotzone from your compositor session to enable hover.
+enabled = @HOVER_ENABLED@
+width = @HOVER_WIDTH@
+height = @HOVER_HEIGHT@
+delay_ms = @HOVER_DELAY_MS@
 
 [reminders]
 # Minutes before a task's due time to send a notification (tasks with a time only).

@@ -40,7 +40,7 @@ Public, open-source Waybar popup: **Google Calendar (read-only) on the left, a l
 
 ## Popup (`$APP popup`)
 - Single instance via GApplication (`APP_ID`); second invocation toggles closed. `$APP popup --show` opens if closed and otherwise leaves it open.
-- Layer-shell overlay, anchored top-center by default, or top-right with `[popup] position = "right"`; `margin_top` applies in both modes, `margin_right` only on the right. Keyboard mode `OnDemand`; closes on Esc or focus loss.
+- Layer-shell overlay, anchored top-center by default, or top-right with `[popup] position = "right"`; `margin_top` applies in both modes, `margin_right` only on the right. Keyboard mode `Exclusive` (sway never focuses an `OnDemand` surface on map, so keys would need a click first); closes on Esc, the toggle, or if the compositor revokes focus.
 - Reloads on DB file change (inotify), so MCP/CLI/daemon writes appear live.
 - **Left pane:** month grid; below it the selected day's Google events (read-only, Meet link if present).
 - **Right pane:** with no date selected, Today = Overdue → Due today → collapsible Inbox (undated). Clicking a date shows that date's tasks (Inbox hidden).

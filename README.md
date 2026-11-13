@@ -194,7 +194,7 @@ exec-once = daypane daemon
 | `/`                  | Search tasks and cached events          |
 | `Esc`                | Close                                   |
 
-Running `daypane popup` while the popup is open toggles it closed. `daypane popup --show` opens it if closed and leaves it open otherwise. It also closes when it loses focus.
+Running `daypane popup` while the popup is open toggles it closed. `daypane popup --show` opens it if closed and leaves it open otherwise. The popup takes keyboard focus exclusively while open, so keys work immediately and other windows can't take the keyboard until you close it with Esc (or the toggle).
 
 ## Quick capture syntax
 

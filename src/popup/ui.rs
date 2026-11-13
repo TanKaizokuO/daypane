@@ -163,7 +163,10 @@ impl Ui {
                 window.set_anchor(Edge::Right, true);
                 window.set_margin(Edge::Right, cfg.popup.margin_right);
             }
-            window.set_keyboard_mode(KeyboardMode::OnDemand);
+            // sway never focuses an on-demand layer surface until it is clicked, and drops
+            // focus as soon as one switches from exclusive to on-demand. Hold the keyboard
+            // exclusively while open so keys work at once; Esc (or the toggle) closes it.
+            window.set_keyboard_mode(KeyboardMode::Exclusive);
             window.set_namespace(Some(APP_NAME));
         } else {
             eprintln!("{APP_NAME}: compositor lacks wlr-layer-shell; showing a regular window");

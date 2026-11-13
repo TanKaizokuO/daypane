@@ -1,0 +1,26 @@
+# @APP_NAME@ configuration. Every key is optional; the values shown are the defaults.
+
+[popup]
+# Distance (px) from the top-right corner of the screen, and the popup size.
+margin_top = @POPUP_MARGIN_TOP@
+margin_right = @POPUP_MARGIN_RIGHT@
+width = @POPUP_WIDTH@
+height = @POPUP_HEIGHT@
+
+[reminders]
+# Minutes before a task's due time to send a notification (tasks with a time only).
+task_offset_minutes = @REMINDERS_TASK_OFFSET_MINUTES@
+# How long the notification "Snooze" action postpones a reminder, in minutes.
+snooze_minutes = @REMINDERS_SNOOZE_MINUTES@
+
+[google]
+# Your own OAuth "Desktop app" client from Google Cloud (see the README guide),
+# then run `@APP_NAME@ login`.
+# client_id = "1234567890-abc.apps.googleusercontent.com"
+# client_secret = "GOCSPX-..."
+# Seconds between incremental calendar syncs.
+sync_interval_seconds = @GOOGLE_SYNC_INTERVAL_SECONDS@
+
+[waybar]
+# Waybar `signal` number; must match the module's "signal" in your Waybar config.
+signal = @WAYBAR_SIGNAL@

@@ -1,0 +1,8 @@
+"custom/@APP_NAME@": {
+    "exec": "cat @WAYBAR_FILE@",
+    "return-type": "json",
+    "interval": 30,
+    "signal": @SIGNAL@,
+    "on-click": "@EXEC@ popup",
+    "tooltip": true
+}

@@ -1,0 +1,7 @@
+#custom-@APP_NAME@ {
+    padding: 0 8px;
+}
+
+#custom-@APP_NAME@.overdue {
+    color: #f38ba8;
+}

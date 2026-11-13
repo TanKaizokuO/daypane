@@ -13,7 +13,7 @@ Click a Waybar module and a layer-shell overlay opens with a month grid, the sel
 - **Waybar module** — next-event countdown (else open-task count), tooltip with today's agenda, `overdue` CSS class.
 - **Agent-native** — an MCP server (`daypane mcp`) exposes the task list to Claude Code and other MCP clients.
 - **Live reload** — the popup refreshes when the database changes, so CLI / MCP / daemon writes appear immediately.
-- **Vim-style keys**, GTK-theme aware, user `style.css` override.
+- **Vim-style keys**, dark mode by default (`light` / `system` selectable), user `style.css` override.
 
 ## Build requirements
 
@@ -287,6 +287,7 @@ Tools:
 |               | `margin_right`         | `8`     | Distance from the right screen edge (px)                                 |
 |               | `width`                | `760`   | Popup width (px)                                                         |
 |               | `height`               | `480`   | Popup height (px)                                                        |
+|               | `theme`                | `"dark"`| `"dark"`, `"light"`, or `"system"` (keep the GTK theme's own setting)     |
 | `[reminders]` | `task_offset_minutes`  | `10`    | Minutes before a task's `due_time` to notify                             |
 |               | `snooze_minutes`       | `10`    | Duration of the notification "Snooze" action                             |
 | `[google]`    | `client_id`            | unset   | OAuth "Desktop app" client ID from your own Google Cloud project         |
@@ -296,7 +297,7 @@ Tools:
 
 ## Theming
 
-The popup follows your GTK theme. To override or extend it, create `~/.config/daypane/style.css`; it is loaded on top of the built-in stylesheet. Available classes:
+The popup is dark by default: it requests the GTK theme's dark variant and layers a built-in dark palette (`src/popup/dark.css`) on top, so it stays dark even with a theme that has no dark variant. Set `[popup] theme = "light"` for the light variant, or `"system"` to follow your GTK theme unchanged (the dark palette is then not loaded). To override or extend any of it, create `~/.config/daypane/style.css`; it is loaded on top of the built-in stylesheets. Available classes:
 
 `.overdue` `.today` `.selected-day` `.priority-high` `.priority-med` `.priority-low`
 

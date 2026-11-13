@@ -77,6 +77,7 @@ impl Vars {
             .with("POPUP_MARGIN_RIGHT", c.popup.margin_right.to_string())
             .with("POPUP_WIDTH", c.popup.width.to_string())
             .with("POPUP_HEIGHT", c.popup.height.to_string())
+            .with("POPUP_THEME", c.popup.theme.as_str())
             .with(
                 "REMINDERS_TASK_OFFSET_MINUTES",
                 c.reminders.task_offset_minutes.to_string(),

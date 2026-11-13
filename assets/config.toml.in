@@ -6,6 +6,8 @@ margin_top = @POPUP_MARGIN_TOP@
 margin_right = @POPUP_MARGIN_RIGHT@
 width = @POPUP_WIDTH@
 height = @POPUP_HEIGHT@
+# Colour scheme: "dark", "light", or "system" (leave the GTK setting alone).
+theme = "@POPUP_THEME@"
 
 [reminders]
 # Minutes before a task's due time to send a notification (tasks with a time only).

@@ -1,5 +1,6 @@
 /*
- * Default popup stylesheet. It follows the active GTK theme (named colors only).
+ * Default popup stylesheet, written against GTK named colors. With `[popup] theme = "dark"`
+ * (the default) dark.css redefines those colors on top of this file.
  * Override anything by creating $XDG_CONFIG_HOME/<app>/style.css; it is loaded on top of this file.
  *
  * Structure and CSS classes

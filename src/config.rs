@@ -21,6 +21,28 @@ pub struct PopupConfig {
     pub margin_right: i32,
     pub width: i32,
     pub height: i32,
+    pub theme: Theme,
+}
+
+/// Popup colour scheme. `Dark`/`Light` select the GTK theme's dark/light variant;
+/// `System` leaves GTK's own setting untouched.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    #[default]
+    Dark,
+    Light,
+    System,
+}
+
+impl Theme {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+            Self::System => "system",
+        }
+    }
 }
 
 impl Default for PopupConfig {
@@ -30,6 +52,7 @@ impl Default for PopupConfig {
             margin_right: 8,
             width: 760,
             height: 480,
+            theme: Theme::Dark,
         }
     }
 }

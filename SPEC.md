@@ -44,7 +44,7 @@ Public, open-source Waybar popup: **Google Calendar (read-only) on the left, a l
 - Reloads on DB file change (inotify), so MCP/CLI/daemon writes appear live.
 - **Left pane:** month grid; below it the selected day's Google events (read-only, Meet link if present).
 - **Right pane:** with no date selected, Today = Overdue → Due today → collapsible Inbox (undated). Clicking a date shows that date's tasks (Inbox hidden).
-- Theming: follows GTK theme; user `style.css` override.
+- Theming: dark by default (`[popup] theme = dark|light|system`); built-in dark palette over the GTK theme's dark variant; user `style.css` override.
 
 ## Input
 - Vim-style: `h/j/k/l` + arrows move days; `Tab` switches panes; `j/k` tasks; `x` complete; `e` edit; `d` trash; `u` undo; `t` today; `N` capture; `/` search; `Esc` close.
